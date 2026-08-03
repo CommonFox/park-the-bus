@@ -29,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     rebuild = subparsers.add_parser("rebuild", help="replay the archive into the warehouse")
     rebuild.add_argument("--source", help="comma-separated source names")
 
+    subparsers.add_parser("coverage", help="competition x season x source grid")
+
     return parser
 
 
@@ -97,7 +99,39 @@ def _cmd_rebuild(args) -> int:
     return 0
 
 
-_HANDLERS = {"ingest": _cmd_ingest, "rebuild": _cmd_rebuild}
+def _cmd_coverage(args) -> int:
+    from . import config
+    from .warehouse import db
+
+    # A read-only connect fails outright if the file is absent, so check first
+    # rather than letting duckdb raise at the user.
+    if not config.DB_PATH.is_file():
+        print("no warehouse yet -- run `ptb ingest` then `ptb rebuild`")
+        return 1
+
+    con = db.connect(read_only=True)
+    try:
+        rows = con.execute(
+            "SELECT 'footballdata' AS source, competition, season, count(*) AS matches "
+            "FROM src_footballdata_match GROUP BY 1, 2, 3 ORDER BY 2, 3"
+        ).fetchall()
+        unresolved = con.execute("SELECT count(*) FROM unresolved_match").fetchone()[0]
+    finally:
+        con.close()
+
+    if not rows:
+        print("warehouse is empty -- run `ptb ingest` then `ptb rebuild`")
+        return 1
+
+    print("{:<14} {:<6} {:<9} {:>8}".format("SOURCE", "COMP", "SEASON", "MATCHES"))
+    for source, competition, season, count in rows:
+        print("{:<14} {:<6} {:<9} {:>8}".format(source, competition, season, count))
+    if unresolved:
+        print("\n{} unresolved match(es) -- see the unresolved_match table".format(unresolved))
+    return 0
+
+
+_HANDLERS = {"ingest": _cmd_ingest, "rebuild": _cmd_rebuild, "coverage": _cmd_coverage}
 
 
 if __name__ == "__main__":

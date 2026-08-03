@@ -67,4 +67,10 @@ def rebuild(
         mark_loaded(con, key)
         written[source] = written.get(source, 0) + rows
 
+    from ..identity import matches as identity_matches
+
+    if written.get("footballdata"):
+        resolved = identity_matches.resolve_footballdata(con)
+        log.info("resolved %d football-data matches into dim_match", resolved)
+
     return written
