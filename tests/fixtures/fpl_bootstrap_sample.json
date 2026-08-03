@@ -1,0 +1,34 @@
+{
+  "source": "fpl", "endpoint": "bootstrap", "season": "2024/25",
+  "url": "https://fantasy.premierleague.com/api/bootstrap-static/",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "events": [
+      {"id": 1, "name": "Gameweek 1", "deadline_time": "2024-08-16T17:30:00Z",
+       "finished": true, "is_current": false, "is_next": false,
+       "average_entry_score": 57, "highest_score": 127}
+    ],
+    "teams": [
+      {"id": 1, "name": "Arsenal", "short_name": "ARS", "strength": 4,
+       "strength_overall_home": 1300, "strength_overall_away": 1310,
+       "strength_attack_home": 1290, "strength_attack_away": 1300,
+       "strength_defence_home": 1280, "strength_defence_away": 1290},
+      {"id": 20, "name": "Wolves", "short_name": "WOL", "strength": 2,
+       "strength_overall_home": 1100, "strength_overall_away": 1080,
+       "strength_attack_home": 1090, "strength_attack_away": 1070,
+       "strength_defence_home": 1085, "strength_defence_away": 1075}
+    ],
+    "element_types": [
+      {"id": 1, "singular_name": "Goalkeeper", "singular_name_short": "GKP"},
+      {"id": 3, "singular_name": "Midfielder", "singular_name_short": "MID"}
+    ],
+    "elements": [
+      {"id": 11, "code": 223094, "web_name": "Saka", "first_name": "Bukayo",
+       "second_name": "Saka", "team": 1, "element_type": 3, "now_cost": 100,
+       "total_points": 200, "form": "5.5", "selected_by_percent": "40.2",
+       "status": "a", "minutes": 3000, "goals_scored": 12, "assists": 15,
+       "clean_sheets": 10, "bonus": 25, "bps": 700, "expected_goals": "10.5",
+       "expected_assists": "12.1", "expected_goal_involvements": "22.6"}
+    ]
+  }
+}

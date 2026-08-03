@@ -269,3 +269,68 @@ CREATE TABLE IF NOT EXISTS src_asa_player_xpass (
     archive_key                         TEXT NOT NULL,
     PRIMARY KEY (league, season, player_id)
 );
+
+-- -------------------------------------------------------------------- fpl
+
+CREATE TABLE IF NOT EXISTS src_fpl_team (
+    season                 TEXT NOT NULL,
+    team_id                INTEGER NOT NULL,
+    name                   TEXT NOT NULL,
+    short_name             TEXT,
+    strength               INTEGER,
+    strength_overall_home  INTEGER,
+    strength_overall_away  INTEGER,
+    strength_attack_home   INTEGER,
+    strength_attack_away   INTEGER,
+    strength_defence_home  INTEGER,
+    strength_defence_away  INTEGER,
+    archive_key            TEXT NOT NULL,
+    PRIMARY KEY (season, team_id)
+);
+
+CREATE TABLE IF NOT EXISTS src_fpl_position (
+    position_id  INTEGER PRIMARY KEY,
+    singular_name TEXT,
+    short_name    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS src_fpl_event (
+    season              TEXT NOT NULL,
+    event_id            INTEGER NOT NULL,
+    name                TEXT,
+    deadline_time       TIMESTAMP,
+    finished            BOOLEAN,
+    is_current          BOOLEAN,
+    is_next             BOOLEAN,
+    average_entry_score INTEGER,
+    highest_score       INTEGER,
+    archive_key         TEXT NOT NULL,
+    PRIMARY KEY (season, event_id)
+);
+
+CREATE TABLE IF NOT EXISTS src_fpl_element (
+    season                     TEXT NOT NULL,
+    element_id                 INTEGER NOT NULL,
+    code                       INTEGER,
+    web_name                   TEXT,
+    first_name                 TEXT,
+    second_name                TEXT,
+    team                       INTEGER,
+    element_type               INTEGER,
+    now_cost                   INTEGER,
+    total_points               INTEGER,
+    form                       DOUBLE,
+    selected_by_percent        DOUBLE,
+    status                     TEXT,
+    minutes                    INTEGER,
+    goals_scored               INTEGER,
+    assists                    INTEGER,
+    clean_sheets               INTEGER,
+    bonus                      INTEGER,
+    bps                        INTEGER,
+    expected_goals             DOUBLE,
+    expected_assists           DOUBLE,
+    expected_goal_involvements DOUBLE,
+    archive_key                TEXT NOT NULL,
+    PRIMARY KEY (season, element_id)
+);

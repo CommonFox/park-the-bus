@@ -1,0 +1,62 @@
+import datetime as dt
+import json
+from pathlib import Path
+
+import pytest
+
+from ptb.core.warehouse import db
+from ptb.core.warehouse.loaders import fpl as loader
+
+FIX = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture
+def con(tmp_path):
+    connection = db.connect(tmp_path / "test.duckdb")
+    yield connection
+    connection.close()
+
+
+def _load(con, name):
+    payload = json.loads((FIX / name).read_text(encoding="utf-8"))
+    return loader.load_fpl(con, payload, "fpl/" + name)
+
+
+def test_fpl_is_registered():
+    from ptb.core.warehouse.load import LOADERS
+    assert "fpl" in LOADERS
+
+
+def test_bootstrap_loads_teams_positions_events_elements(con):
+    _load(con, "fpl_bootstrap_sample.json")
+    assert con.execute("SELECT count(*) FROM src_fpl_team").fetchone()[0] == 2
+    assert con.execute("SELECT count(*) FROM src_fpl_position").fetchone()[0] == 2
+    assert con.execute("SELECT count(*) FROM src_fpl_event").fetchone()[0] == 1
+    assert con.execute("SELECT count(*) FROM src_fpl_element").fetchone()[0] == 1
+
+
+def test_bootstrap_maps_team_and_element_columns(con):
+    _load(con, "fpl_bootstrap_sample.json")
+    team = con.execute(
+        "SELECT name, short_name, strength_overall_home FROM src_fpl_team "
+        "WHERE season = '2024/25' AND team_id = 1"
+    ).fetchone()
+    assert team == ("Arsenal", "ARS", 1300)
+
+    el = con.execute(
+        "SELECT web_name, team, element_type, now_cost, total_points, "
+        "       selected_by_percent, expected_goals, code "
+        "FROM src_fpl_element WHERE season = '2024/25' AND element_id = 11"
+    ).fetchone()
+    assert el[0] == "Saka"
+    assert (el[1], el[2], el[3], el[4]) == (1, 3, 100, 200)
+    assert el[5] == pytest.approx(40.2)
+    assert el[6] == pytest.approx(10.5)
+    assert el[7] == 223094
+
+
+def test_bootstrap_is_idempotent(con):
+    _load(con, "fpl_bootstrap_sample.json")
+    _load(con, "fpl_bootstrap_sample.json")
+    assert con.execute("SELECT count(*) FROM src_fpl_team").fetchone()[0] == 2
+    assert con.execute("SELECT count(*) FROM src_fpl_element").fetchone()[0] == 1
