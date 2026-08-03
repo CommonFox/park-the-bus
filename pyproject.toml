@@ -1,0 +1,21 @@
+[project]
+name = "park-the-bus"
+version = "0.1.0"
+description = "Personal soccer analytics monorepo"
+requires-python = ">=3.12"
+dependencies = ["ptb-core"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+ptb-core = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
