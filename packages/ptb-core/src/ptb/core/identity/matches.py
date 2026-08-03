@@ -206,3 +206,31 @@ def resolve_asa(con: duckdb.DuckDBPyConnection) -> int:
         ) is not None:
             resolved += 1
     return resolved
+
+
+def resolve_fpl(con: duckdb.DuckDBPyConnection) -> int:
+    """Resolve every FPL fixture into dim_match. Idempotent.
+
+    FPL fixtures reference teams by numeric id, so each is joined to
+    src_fpl_team for the names resolve_match needs. Fixtures are Premier League
+    matches, so they resolve against football-data and Understat rows already in
+    dim_match -- the first three-source match identity in the project.
+    """
+    rows = con.execute(
+        "SELECT f.season, f.fixture_id, f.kickoff_time, th.name, ta.name "
+        "FROM src_fpl_fixture f "
+        "JOIN src_fpl_team th ON th.season = f.season AND th.team_id = f.team_h "
+        "JOIN src_fpl_team ta ON ta.season = f.season AND ta.team_id = f.team_a "
+        "WHERE f.kickoff_time IS NOT NULL "
+        "ORDER BY f.kickoff_time, f.fixture_id"
+    ).fetchall()
+
+    resolved = 0
+    for season, fixture_id, kickoff, home, away in rows:
+        if resolve_match(
+            con, source="fpl", source_match_id="{}|{}".format(season, fixture_id),
+            competition="E0", season=season, kickoff=kickoff,
+            home_team=home, away_team=away,
+        ) is not None:
+            resolved += 1
+    return resolved
