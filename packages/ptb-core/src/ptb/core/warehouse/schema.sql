@@ -133,3 +133,22 @@ CREATE TABLE IF NOT EXISTS src_understat_match (
     forecast_l    DOUBLE,
     archive_key   TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS src_understat_shot (
+    understat_shot_id  TEXT PRIMARY KEY,
+    understat_match_id TEXT NOT NULL,
+    minute        INTEGER,
+    player        TEXT,
+    player_id     TEXT,
+    team          TEXT,
+    home_away     TEXT,
+    xg            DOUBLE,
+    result        TEXT,
+    situation     TEXT,
+    shot_type     TEXT,
+    x             DOUBLE,
+    y             DOUBLE,
+    assist_player TEXT,
+    last_action   TEXT,
+    archive_key   TEXT NOT NULL
+);
