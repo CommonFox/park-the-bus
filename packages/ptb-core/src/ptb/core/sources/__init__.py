@@ -7,3 +7,4 @@ from . import footballdata  # noqa: F401,E402  -- imported for registration side
 from . import understat  # noqa: F401,E402  -- imported for registration side effect
 from . import asa  # noqa: F401,E402  -- imported for registration side effect
 from . import fpl  # noqa: F401,E402  -- imported for registration side effect
+from . import vaastav  # noqa: F401,E402  -- imported for registration side effect
