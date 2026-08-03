@@ -76,3 +76,44 @@ def test_loaders_are_idempotent(con):
         _load(con, name)
     assert con.execute("SELECT count(*) FROM src_asa_team").fetchone()[0] == 2
     assert con.execute("SELECT count(*) FROM src_asa_game").fetchone()[0] == 1
+
+
+def test_goals_added_explodes_by_action_type(con):
+    assert _load(con, "asa_nwsl_goals_added_sample.json") == 2
+    rows = con.execute(
+        "SELECT action_type, goals_added_raw, count_actions "
+        "FROM src_asa_player_goals_added WHERE player_id = 'P1' ORDER BY action_type"
+    ).fetchall()
+    assert rows == [("Receiving", pytest.approx(0.8), 400),
+                    ("Shooting", pytest.approx(2.5), 60)]
+
+
+def test_player_xgoals_loader(con):
+    assert _load(con, "asa_nwsl_xgoals_sample.json") == 1
+    row = con.execute(
+        "SELECT goals, xgoals, primary_assists, points_added "
+        "FROM src_asa_player_xgoals WHERE player_id = 'P1' AND season = '2024'"
+    ).fetchone()
+    assert row[0] == 14
+    assert row[1] == pytest.approx(12.6)
+    assert row[2] == 5
+    assert row[3] == pytest.approx(3.4)
+
+
+def test_player_xpass_loader(con):
+    assert _load(con, "asa_nwsl_xpass_sample.json") == 1
+    row = con.execute(
+        "SELECT attempted_passes, xpass_completion_percentage, count_games "
+        "FROM src_asa_player_xpass WHERE player_id = 'P1' AND season = '2024'"
+    ).fetchone()
+    assert row[0] == 900
+    assert row[1] == pytest.approx(0.74)
+    assert row[2] == 22
+
+
+def test_player_stat_loaders_are_idempotent(con):
+    for name in ("asa_nwsl_goals_added_sample.json", "asa_nwsl_xgoals_sample.json"):
+        _load(con, name)
+        _load(con, name)
+    assert con.execute("SELECT count(*) FROM src_asa_player_goals_added").fetchone()[0] == 2
+    assert con.execute("SELECT count(*) FROM src_asa_player_xgoals").fetchone()[0] == 1

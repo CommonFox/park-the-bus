@@ -1,0 +1,13 @@
+{
+  "source": "asa", "endpoint": "nwsl/players-xpass", "league": "nwsl",
+  "resource": "players/xpass", "season": "2024",
+  "url": "https://app.americansocceranalysis.com/api/v1/nwsl/players/xpass",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": [
+    {"player_id": "P1", "team_id": "T_POR", "general_position": "ST", "minutes_played": 1800,
+     "attempted_passes": 900, "pass_completion_percentage": 0.78,
+     "xpass_completion_percentage": 0.74, "passes_completed_over_expected": 36.0,
+     "passes_completed_over_expected_p100": 4.0, "avg_distance_yds": 15.2,
+     "avg_vertical_distance_yds": 6.1, "share_team_touches": 0.09, "count_games": 22}
+  ]
+}
