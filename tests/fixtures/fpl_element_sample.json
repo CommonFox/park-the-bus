@@ -1,0 +1,32 @@
+{
+  "source": "fpl", "endpoint": "element", "season": "2024/25", "element_id": 11,
+  "url": "https://fantasy.premierleague.com/api/element-summary/11/",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "fixtures": [],
+    "history_past": [],
+    "history": [
+      {"element": 11, "fixture": 1, "opponent_team": 20, "round": 1, "minutes": 90,
+       "total_points": 13, "goals_scored": 1, "assists": 1, "clean_sheets": 1,
+       "goals_conceded": 0, "own_goals": 0, "penalties_saved": 0, "penalties_missed": 0,
+       "yellow_cards": 0, "red_cards": 0, "saves": 0, "bonus": 2, "bps": 45,
+       "influence": "40.2", "creativity": "55.1", "threat": "60.0", "ict_index": "15.5",
+       "expected_goals": "0.55", "expected_assists": "0.33",
+       "expected_goal_involvements": "0.88", "expected_goals_conceded": "0.70",
+       "value": 100, "selected": 4200000, "transfers_balance": 0, "transfers_in": 0,
+       "transfers_out": 0, "was_home": true, "kickoff_time": "2024-08-17T14:00:00Z",
+       "team_h_score": 2, "team_a_score": 0, "starts": 1},
+      {"element": 11, "fixture": 12, "opponent_team": 5, "round": 2, "minutes": 78,
+       "total_points": 6, "goals_scored": 0, "assists": 1, "clean_sheets": 0,
+       "goals_conceded": 1, "own_goals": 0, "penalties_saved": 0, "penalties_missed": 0,
+       "yellow_cards": 1, "red_cards": 0, "saves": 0, "bonus": 0, "bps": 25,
+       "influence": "20.0", "creativity": "30.0", "threat": "18.0", "ict_index": "6.8",
+       "expected_goals": "0.10", "expected_assists": "0.40",
+       "expected_goal_involvements": "0.50", "expected_goals_conceded": "1.20",
+       "value": 101, "selected": 4500000, "transfers_balance": 300000,
+       "transfers_in": 350000, "transfers_out": 50000, "was_home": false,
+       "kickoff_time": "2024-08-24T14:00:00Z", "team_h_score": 1, "team_a_score": 1,
+       "starts": 1}
+    ]
+  }
+}

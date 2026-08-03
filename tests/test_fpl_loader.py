@@ -86,3 +86,33 @@ def test_fixtures_loader_is_idempotent(con):
     _load(con, "fpl_fixtures_sample.json")
     _load(con, "fpl_fixtures_sample.json")
     assert con.execute("SELECT count(*) FROM src_fpl_fixture").fetchone()[0] == 2
+
+
+def test_element_history_loads_each_gameweek(con):
+    assert _load(con, "fpl_element_sample.json") == 2
+    assert con.execute(
+        "SELECT count(*) FROM src_fpl_player_gw WHERE source = 'api'"
+    ).fetchone()[0] == 2
+
+
+def test_element_history_maps_columns(con):
+    _load(con, "fpl_element_sample.json")
+    row = con.execute(
+        "SELECT event, fixture, opponent_team, minutes, total_points, goals_scored, "
+        "       assists, bonus, bps, expected_goals, value, was_home "
+        "FROM src_fpl_player_gw WHERE element_id = 11 AND event = 1 AND source = 'api'"
+    ).fetchone()
+    assert row[0] == 1
+    assert (row[1], row[2]) == (1, 20)
+    assert (row[3], row[4]) == (90, 13)
+    assert (row[5], row[6]) == (1, 1)
+    assert (row[7], row[8]) == (2, 45)
+    assert row[9] == pytest.approx(0.55)
+    assert row[10] == 100
+    assert row[11] is True
+
+
+def test_element_history_is_idempotent(con):
+    _load(con, "fpl_element_sample.json")
+    _load(con, "fpl_element_sample.json")
+    assert con.execute("SELECT count(*) FROM src_fpl_player_gw").fetchone()[0] == 2
