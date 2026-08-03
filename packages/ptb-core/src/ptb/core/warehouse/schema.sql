@@ -114,3 +114,22 @@ CREATE TABLE IF NOT EXISTS unresolved_match (
     detail          TEXT,
     PRIMARY KEY (source, source_match_id)
 );
+
+-- --------------------------------------------------------------- understat
+
+CREATE TABLE IF NOT EXISTS src_understat_match (
+    understat_match_id TEXT PRIMARY KEY,
+    competition   TEXT NOT NULL,
+    season        TEXT NOT NULL,
+    kickoff       TIMESTAMP,
+    home_team     TEXT NOT NULL,
+    away_team     TEXT NOT NULL,
+    home_goals    INTEGER,
+    away_goals    INTEGER,
+    home_xg       DOUBLE,
+    away_xg       DOUBLE,
+    forecast_w    DOUBLE,
+    forecast_d    DOUBLE,
+    forecast_l    DOUBLE,
+    archive_key   TEXT NOT NULL
+);
