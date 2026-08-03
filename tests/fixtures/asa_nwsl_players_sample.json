@@ -1,0 +1,11 @@
+{
+  "source": "asa", "endpoint": "nwsl/players", "league": "nwsl", "resource": "players",
+  "season": null, "url": "https://app.americansocceranalysis.com/api/v1/nwsl/players",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": [
+    {"player_id": "P1", "player_name": "Sophia Smith", "birth_date": "2000-08-10",
+     "nationality": "USA", "primary_general_position": "ST", "season_name": "2024"},
+    {"player_id": "P1", "player_name": "Sophia Smith", "birth_date": "2000-08-10",
+     "nationality": "USA", "primary_general_position": "ST", "season_name": "2023"}
+  ]
+}

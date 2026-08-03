@@ -28,6 +28,12 @@ INSERT OR REPLACE INTO dim_competition (competition_id, country, name, tier, gen
     ('F1',  'France',  'Ligue 1',          1, 'M'),
     ('F2',  'France',  'Ligue 2',          2, 'M');
 
+INSERT OR REPLACE INTO dim_competition (competition_id, country, name, tier, gender) VALUES
+    ('NWSL', 'USA', 'National Womens Soccer League', 1, 'W'),
+    ('MLS',  'USA', 'Major League Soccer',           1, 'M'),
+    ('USLC', 'USA', 'USL Championship',              2, 'M'),
+    ('USL1', 'USA', 'USL League One',                3, 'M');
+
 -- ------------------------------------------------------------- source-faithful
 -- One table per source per entity. Never merged, never reconciled: where two
 -- sources disagree, both values survive here and a conformed view picks one.
@@ -151,4 +157,57 @@ CREATE TABLE IF NOT EXISTS src_understat_shot (
     assist_player TEXT,
     last_action   TEXT,
     archive_key   TEXT NOT NULL
+);
+
+-- -------------------------------------------------------------------- asa
+
+CREATE TABLE IF NOT EXISTS src_asa_team (
+    league            TEXT NOT NULL,
+    team_id           TEXT NOT NULL,
+    team_name         TEXT NOT NULL,
+    team_short_name   TEXT,
+    team_abbreviation TEXT,
+    PRIMARY KEY (league, team_id)
+);
+
+CREATE TABLE IF NOT EXISTS src_asa_player (
+    league                   TEXT NOT NULL,
+    player_id                TEXT NOT NULL,
+    season                   TEXT NOT NULL,
+    player_name              TEXT,
+    birth_date               DATE,
+    nationality              TEXT,
+    primary_general_position TEXT,
+    PRIMARY KEY (league, player_id, season)
+);
+
+CREATE TABLE IF NOT EXISTS src_asa_game (
+    game_id      TEXT PRIMARY KEY,
+    league       TEXT NOT NULL,
+    season       TEXT NOT NULL,
+    kickoff_utc  TIMESTAMP,
+    home_team_id TEXT NOT NULL,
+    away_team_id TEXT NOT NULL,
+    home_score   INTEGER,
+    away_score   INTEGER,
+    matchday     INTEGER,
+    status       TEXT,
+    archive_key  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS src_asa_game_xgoals (
+    game_id            TEXT PRIMARY KEY,
+    league             TEXT NOT NULL,
+    season             TEXT NOT NULL,
+    home_team_id       TEXT,
+    away_team_id       TEXT,
+    home_goals         INTEGER,
+    away_goals         INTEGER,
+    home_team_xgoals   DOUBLE,
+    away_team_xgoals   DOUBLE,
+    home_player_xgoals DOUBLE,
+    away_player_xgoals DOUBLE,
+    home_xpoints       DOUBLE,
+    away_xpoints       DOUBLE,
+    archive_key        TEXT NOT NULL
 );
