@@ -146,3 +146,63 @@ def resolve_footballdata(con: duckdb.DuckDBPyConnection) -> int:
         ) is not None:
             resolved += 1
     return resolved
+
+
+def resolve_understat(con: duckdb.DuckDBPyConnection) -> int:
+    """Resolve every understat match into dim_match. Idempotent.
+
+    Big-5 matches resolve against football-data's existing dim_match rows via
+    the +/-36h window, which is the first cross-source match identity in the
+    project.
+    """
+    rows = con.execute(
+        "SELECT understat_match_id, competition, season, kickoff, home_team, away_team "
+        "FROM src_understat_match WHERE kickoff IS NOT NULL "
+        "ORDER BY kickoff, understat_match_id"
+    ).fetchall()
+
+    resolved = 0
+    for match_id, competition, season, kickoff, home, away in rows:
+        if resolve_match(
+            con, source="understat", source_match_id=str(match_id),
+            competition=competition, season=season, kickoff=kickoff,
+            home_team=home, away_team=away,
+        ) is not None:
+            resolved += 1
+    return resolved
+
+
+_ASA_LEAGUE_TO_COMPETITION = {
+    "nwsl": "NWSL", "mls": "MLS", "uslc": "USLC", "usl1": "USL1",
+}
+
+
+def resolve_asa(con: duckdb.DuckDBPyConnection) -> int:
+    """Resolve every ASA game into dim_match. Idempotent.
+
+    ASA games reference teams by hashed id, so the game is joined to
+    src_asa_team for the names resolve_match needs. NWSL kickoffs are true UTC,
+    so late kickoffs crossing the local date boundary resolve through the
+    +/-36h window against any other source reporting the local date.
+    """
+    rows = con.execute(
+        "SELECT g.game_id, g.league, g.season, g.kickoff_utc, ht.team_name, awt.team_name "
+        "FROM src_asa_game g "
+        "JOIN src_asa_team ht ON ht.league = g.league AND ht.team_id = g.home_team_id "
+        "JOIN src_asa_team awt ON awt.league = g.league AND awt.team_id = g.away_team_id "
+        "WHERE g.kickoff_utc IS NOT NULL "
+        "ORDER BY g.kickoff_utc, g.game_id"
+    ).fetchall()
+
+    resolved = 0
+    for game_id, league, season, kickoff, home, away in rows:
+        competition = _ASA_LEAGUE_TO_COMPETITION.get(league)
+        if competition is None:
+            continue
+        if resolve_match(
+            con, source="asa", source_match_id=str(game_id),
+            competition=competition, season=season, kickoff=kickoff,
+            home_team=home, away_team=away,
+        ) is not None:
+            resolved += 1
+    return resolved

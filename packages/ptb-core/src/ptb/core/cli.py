@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("source", help="source name, or 'all'")
     ingest.add_argument("--competition", help="comma-separated competition codes")
     ingest.add_argument("--season", help="comma-separated seasons, e.g. 2024/25,2023/24")
+    ingest.add_argument("--refetch", action="store_true",
+                        help="re-fetch payloads already in the archive")
 
     rebuild = subparsers.add_parser("rebuild", help="replay the archive into the warehouse")
     rebuild.add_argument("--source", help="comma-separated source names")
@@ -70,6 +72,8 @@ def _cmd_ingest(args) -> int:
         options["competitions"] = [c.strip() for c in args.competition.split(",")]
     if args.season:
         options["seasons"] = [parse_season(s.strip()) for s in args.season.split(",")]
+    if args.refetch:
+        options["refetch"] = True
 
     total = 0
     for name in names:
@@ -113,7 +117,17 @@ def _cmd_coverage(args) -> int:
     try:
         rows = con.execute(
             "SELECT 'footballdata' AS source, competition, season, count(*) AS matches "
-            "FROM src_footballdata_match GROUP BY 1, 2, 3 ORDER BY 2, 3"
+            "  FROM src_footballdata_match GROUP BY 1, 2, 3 "
+            "UNION ALL "
+            "SELECT 'understat', competition, season, count(*) "
+            "  FROM src_understat_match GROUP BY 1, 2, 3 "
+            "UNION ALL "
+            "SELECT 'asa', "
+            "  CASE league WHEN 'nwsl' THEN 'NWSL' WHEN 'mls' THEN 'MLS' "
+            "              WHEN 'uslc' THEN 'USLC' WHEN 'usl1' THEN 'USL1' ELSE league END, "
+            "  season, count(*) "
+            "  FROM src_asa_game GROUP BY 1, 2, 3 "
+            "ORDER BY 1, 2, 3"
         ).fetchall()
         unresolved = con.execute("SELECT count(*) FROM unresolved_match").fetchone()[0]
     finally:

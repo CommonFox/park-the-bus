@@ -1,0 +1,13 @@
+{
+  "source": "asa", "endpoint": "nwsl/players-goals-added", "league": "nwsl",
+  "resource": "players/goals-added", "season": "2024",
+  "url": "https://app.americansocceranalysis.com/api/v1/nwsl/players/goals-added",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": [
+    {"player_id": "P1", "team_id": "T_POR", "general_position": "ST", "minutes_played": 1800,
+     "data": [
+       {"action_type": "Shooting", "goals_added_raw": 2.5, "goals_added_above_avg": 1.1, "count_actions": 60},
+       {"action_type": "Receiving", "goals_added_raw": 0.8, "goals_added_above_avg": 0.3, "count_actions": 400}
+     ]}
+  ]
+}

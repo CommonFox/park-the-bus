@@ -1,0 +1,10 @@
+{
+  "source": "asa", "endpoint": "nwsl/games", "league": "nwsl", "resource": "games",
+  "season": "2024", "url": "https://app.americansocceranalysis.com/api/v1/nwsl/games",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": [
+    {"game_id": "G1", "date_time_utc": "2024-06-15 02:30:00 UTC", "home_score": 2,
+     "away_score": 1, "home_team_id": "T_POR", "away_team_id": "T_SEA",
+     "matchday": 10, "status": "FullTime", "season_name": "2024"}
+  ]
+}
