@@ -57,3 +57,59 @@ def test_resolve_understat_is_idempotent(con):
     matches.resolve_understat(con)
     matches.resolve_understat(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
+
+
+def _insert_asa_team(con, league, team_id, name):
+    con.execute(
+        "INSERT OR REPLACE INTO src_asa_team (league, team_id, team_name) VALUES (?, ?, ?)",
+        [league, team_id, name])
+
+
+def _insert_asa_game(con, gid, league, season, kickoff, home_id, away_id):
+    con.execute(
+        "INSERT INTO src_asa_game "
+        "(game_id, league, season, kickoff_utc, home_team_id, away_team_id, archive_key) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'k')",
+        [gid, league, season, kickoff, home_id, away_id])
+
+
+def test_resolve_asa_maps_games_via_team_names(con):
+    _insert_asa_team(con, "nwsl", "T_POR", "Portland Thorns FC")
+    _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
+    _insert_asa_game(con, "G1", "nwsl", "2024",
+                     dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
+    resolved = matches.resolve_asa(con)
+    assert resolved == 1
+    row = con.execute(
+        "SELECT m.competition, t.canonical_name FROM dim_match m "
+        "JOIN dim_team t ON t.team_id = m.home_team_id"
+    ).fetchone()
+    assert row == ("NWSL", "Portland Thorns FC")
+
+
+def test_asa_late_kickoff_resolves_within_window(con):
+    """An NWSL game at 02:30 UTC (prior evening Pacific) and a source reporting
+    the local Saturday date must resolve to one dim_match."""
+    _insert_asa_team(con, "nwsl", "T_POR", "Portland Thorns FC")
+    _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
+    _insert_asa_game(con, "G_UTC", "nwsl", "2024",
+                     dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
+    matches.resolve_asa(con)
+
+    other = matches.resolve_match(
+        con, source="fotmob", source_match_id="fm-1", competition="NWSL",
+        season="2024", kickoff=dt.datetime(2024, 6, 14, 19, 30),
+        home_team="Portland Thorns FC", away_team="Seattle Reign FC")
+
+    assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
+    assert other is not None
+
+
+def test_resolve_asa_is_idempotent(con):
+    _insert_asa_team(con, "nwsl", "T_POR", "Portland Thorns FC")
+    _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
+    _insert_asa_game(con, "G1", "nwsl", "2024",
+                     dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
+    matches.resolve_asa(con)
+    matches.resolve_asa(con)
+    assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
