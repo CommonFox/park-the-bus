@@ -60,3 +60,29 @@ def test_bootstrap_is_idempotent(con):
     _load(con, "fpl_bootstrap_sample.json")
     assert con.execute("SELECT count(*) FROM src_fpl_team").fetchone()[0] == 2
     assert con.execute("SELECT count(*) FROM src_fpl_element").fetchone()[0] == 1
+
+
+def test_fixtures_loader_writes_rows(con):
+    assert _load(con, "fpl_fixtures_sample.json") == 2
+    assert con.execute("SELECT count(*) FROM src_fpl_fixture").fetchone()[0] == 2
+
+
+def test_fixtures_loader_maps_columns(con):
+    _load(con, "fpl_fixtures_sample.json")
+    row = con.execute(
+        "SELECT event, kickoff_time, team_h, team_a, team_h_score, team_a_score, "
+        "       finished, team_h_difficulty FROM src_fpl_fixture "
+        "WHERE season = '2024/25' AND fixture_id = 1"
+    ).fetchone()
+    assert row[0] == 1
+    assert row[1] == dt.datetime(2024, 8, 17, 14, 0)
+    assert (row[2], row[3]) == (1, 20)
+    assert (row[4], row[5]) == (2, 0)
+    assert row[6] is True
+    assert row[7] == 2
+
+
+def test_fixtures_loader_is_idempotent(con):
+    _load(con, "fpl_fixtures_sample.json")
+    _load(con, "fpl_fixtures_sample.json")
+    assert con.execute("SELECT count(*) FROM src_fpl_fixture").fetchone()[0] == 2
