@@ -1,0 +1,40 @@
+# Hand-maintained. Keys are normalized variants (see identity/text.py);
+# values are the canonical club name. Small and stable by design -- roughly
+# one entry per club that a source spells unusually.
+"man united": Manchester United
+"man utd": Manchester United
+"manchester utd": Manchester United
+"man city": Manchester City
+"manchester city": Manchester City
+"nottm forest": Nottingham Forest
+"sheffield weds": Sheffield Wednesday
+"sheffield united": Sheffield United
+"wolves": Wolverhampton Wanderers
+"west brom": West Bromwich Albion
+"west ham": West Ham United
+"newcastle": Newcastle United
+"tottenham": Tottenham Hotspur
+"spurs": Tottenham Hotspur
+"leicester": Leicester City
+"norwich": Norwich City
+"ath bilbao": Athletic Bilbao
+"ath madrid": Atletico Madrid
+"atletico madrid": Atletico Madrid
+"espanol": Espanyol
+"sociedad": Real Sociedad
+"betis": Real Betis
+"celta": Celta Vigo
+"mgladbach": Borussia Monchengladbach
+"monchengladbach": Borussia Monchengladbach
+"dortmund": Borussia Dortmund
+"bayern munich": Bayern Munich
+"ein frankfurt": Eintracht Frankfurt
+"leverkusen": Bayer Leverkusen
+"inter": Inter Milan
+"ac milan": AC Milan
+"milan": AC Milan
+"juventus": Juventus
+"paris sg": Paris Saint-Germain
+"psg": Paris Saint-Germain
+"marseille": Olympique Marseille
+"lyon": Olympique Lyonnais
