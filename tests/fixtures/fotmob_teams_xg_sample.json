@@ -1,0 +1,18 @@
+{
+  "source": "fotmob", "endpoint": "premier-league/teams", "league": "premier-league",
+  "league_id": 47, "season": "2024/25", "season_id": 23685, "stat": "expected_goals_team",
+  "stat_type": "teams", "url": "https://www.fotmob.com/api/data/leagueseasondeepstats",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "seasons": [{"id": 23685, "name": "2024/2025", "leagueId": 47}],
+    "leagueDetails": {"id": 47, "name": "Premier League"},
+    "statsList": [
+      {"name": "expected_goals_team", "title": "Expected goals (xG)", "category": "Attacking"}
+    ],
+    "statsData": [
+      {"id": 9825, "teamId": 9825, "name": "Arsenal", "position": null,
+       "statValue": {"name": "expected_goals_team", "value": 72.5}, "substatValue": {"value": 69},
+       "rank": 1, "type": "teams"}
+    ]
+  }
+}
