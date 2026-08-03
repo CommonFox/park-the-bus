@@ -9,3 +9,4 @@ from . import asa  # noqa: F401,E402  -- imported for registration side effect
 from . import fpl  # noqa: F401,E402  -- imported for registration side effect
 from . import vaastav  # noqa: F401,E402  -- imported for registration side effect
 from . import fotmob  # noqa: F401,E402  -- imported for registration side effect
+from . import draftkings  # noqa: F401,E402  -- imported for registration side effect
