@@ -1,0 +1,9 @@
+{
+  "source": "vaastav", "endpoint": "season", "season": "2024/25",
+  "url": "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/2024-25/",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "players_raw": "id,code,first_name,second_name,web_name,element_type,team,team_code,now_cost,total_points,minutes\n11,223094,Bukayo,Saka,Saka,3,1,3,100,200,3000\n",
+    "merged_gw": "name,position,team,element,fixture,opponent_team,round,minutes,total_points,goals_scored,assists,bonus,bps,expected_goals,value,selected,starts,was_home,kickoff_time,team_h_score,team_a_score\nBukayo Saka,MID,Arsenal,11,1,20,1,90,13,1,1,2,45,0.55,100,4200000,1,True,2024-08-17T14:00:00Z,2,0\n"
+  }
+}

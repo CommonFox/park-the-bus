@@ -1,0 +1,13 @@
+{
+  "source": "fpl", "endpoint": "fixtures", "season": "2024/25",
+  "url": "https://fantasy.premierleague.com/api/fixtures/",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": [
+    {"id": 1, "code": 2444470, "event": 1, "kickoff_time": "2024-08-17T14:00:00Z",
+     "team_h": 1, "team_a": 20, "team_h_score": 2, "team_a_score": 0,
+     "finished": true, "team_h_difficulty": 2, "team_a_difficulty": 4},
+    {"id": 2, "code": 2444471, "event": 1, "kickoff_time": null,
+     "team_h": 5, "team_a": 6, "team_h_score": null, "team_a_score": null,
+     "finished": false, "team_h_difficulty": 3, "team_a_difficulty": 3}
+  ]
+}

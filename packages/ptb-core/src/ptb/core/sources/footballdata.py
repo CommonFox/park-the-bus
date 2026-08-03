@@ -60,8 +60,9 @@ def season_label(start_year: int) -> str:
 
 
 def parse_season(label: str) -> int:
-    """'2024/25' -> 2024."""
-    return int(label.split("/")[0])
+    """'2024/25' -> 2024. Also tolerates the dash form '2024-25' (used by
+    vaastav) so a single --season flag works across every source."""
+    return int(label.replace("-", "/").split("/")[0])
 
 
 def decode_csv(raw: bytes) -> str:

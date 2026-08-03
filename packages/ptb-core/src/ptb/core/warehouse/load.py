@@ -81,4 +81,8 @@ def rebuild(
         resolved = identity_matches.resolve_asa(con)
         log.info("resolved %d asa games into dim_match", resolved)
 
+    if written.get("fpl"):
+        resolved = identity_matches.resolve_fpl(con)
+        log.info("resolved %d fpl fixtures into dim_match", resolved)
+
     return written

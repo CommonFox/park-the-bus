@@ -6,3 +6,5 @@ __all__ = ["Source", "register_source", "get_source", "list_sources", "UnknownSo
 from . import footballdata  # noqa: F401,E402  -- imported for registration side effect
 from . import understat  # noqa: F401,E402  -- imported for registration side effect
 from . import asa  # noqa: F401,E402  -- imported for registration side effect
+from . import fpl  # noqa: F401,E402  -- imported for registration side effect
+from . import vaastav  # noqa: F401,E402  -- imported for registration side effect

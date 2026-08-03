@@ -32,6 +32,11 @@ def warehouse(tmp_path, monkeypatch):
         "(game_id, league, season, kickoff_utc, home_team_id, away_team_id, archive_key) "
         "VALUES ('G1', 'nwsl', '2024', TIMESTAMP '2024-06-15 02:30:00', 'T_POR', 'T_SEA', 'k')"
     )
+    con.execute(
+        "INSERT INTO src_fpl_fixture "
+        "(season, fixture_id, event, kickoff_time, team_h, team_a, archive_key) "
+        "VALUES ('2024/25', 1, 1, TIMESTAMP '2024-08-17 14:00:00', 1, 20, 'k')"
+    )
     con.close()
     return db_path
 
@@ -47,6 +52,14 @@ def test_coverage_reports_all_three_sources(warehouse):
     assert "asa" in text
     assert "NWSL" in text  # asa league mapped to competition
     assert "E0" in text
+
+
+def test_coverage_includes_fpl(warehouse):
+    out = io.StringIO()
+    with redirect_stdout(out):
+        rc = _cmd_coverage(_Args())
+    assert rc == 0
+    assert "fpl" in out.getvalue()
 
 
 def test_coverage_reports_empty_warehouse(tmp_path, monkeypatch):
