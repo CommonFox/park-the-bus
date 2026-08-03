@@ -1,0 +1,22 @@
+{
+  "source": "fotmob", "endpoint": "premier-league/players", "league": "premier-league",
+  "league_id": 47, "season": "2024/25", "season_id": 23685, "stat": "expected_goals",
+  "stat_type": "players", "url": "https://www.fotmob.com/api/data/leagueseasondeepstats",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "seasons": [{"id": 23685, "name": "2024/2025", "leagueId": 47}],
+    "leagueDetails": {"id": 47, "name": "Premier League"},
+    "statsList": [
+      {"name": "expected_goals", "title": "Expected goals (xG)", "category": "Attacking"},
+      {"name": "goals", "title": "Goals", "category": "Attacking"}
+    ],
+    "statsData": [
+      {"id": 292462, "teamId": 8650, "name": "Mohamed Salah", "position": 83,
+       "statValue": {"name": "expected_goals", "value": 25.4}, "substatValue": {"value": 29},
+       "rank": 1, "type": "players"},
+      {"id": 646018, "teamId": 8456, "name": "Erling Haaland", "position": 89,
+       "statValue": {"name": "expected_goals", "value": 24.1}, "substatValue": {"value": 22},
+       "rank": 2, "type": "players"}
+    ]
+  }
+}
