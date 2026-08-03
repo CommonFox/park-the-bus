@@ -19,7 +19,13 @@ def build_parser() -> argparse.ArgumentParser:
     # than raising SystemExit from argparse's built-in version action.
     parser.add_argument("--version", action="store_true", help="print version and exit")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
-    parser.add_subparsers(dest="command", metavar="<command>")
+    subparsers = parser.add_subparsers(dest="command", metavar="<command>")
+
+    ingest = subparsers.add_parser("ingest", help="fetch from a source into the archive")
+    ingest.add_argument("source", help="source name, or 'all'")
+    ingest.add_argument("--competition", help="comma-separated competition codes")
+    ingest.add_argument("--season", help="comma-separated seasons, e.g. 2024/25,2023/24")
+
     return parser
 
 
@@ -46,7 +52,30 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return handler(args)
 
 
-_HANDLERS: dict = {}
+def _cmd_ingest(args) -> int:
+    from .archive import RawArchive
+    from .sources import get_source, list_sources
+    from .sources.footballdata import parse_season
+
+    names = list_sources() if args.source == "all" else [args.source]
+    archive = RawArchive()
+
+    options = {}
+    if args.competition:
+        options["competitions"] = [c.strip() for c in args.competition.split(",")]
+    if args.season:
+        options["seasons"] = [parse_season(s.strip()) for s in args.season.split(",")]
+
+    total = 0
+    for name in names:
+        keys = get_source(name).ingest(archive, **options)
+        print("{}: archived {} payload(s)".format(name, len(keys)))
+        total += len(keys)
+
+    return 0 if total else 1
+
+
+_HANDLERS = {"ingest": _cmd_ingest}
 
 
 if __name__ == "__main__":
