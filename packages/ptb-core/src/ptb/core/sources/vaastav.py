@@ -35,6 +35,20 @@ def season_label(dash: str) -> str:
     return "{}/{}".format(start, end)
 
 
+def to_dash(season) -> str:
+    """Normalise a season to vaastav's dash form '2024-25'.
+
+    Accepts an int start year (2024, as the CLI produces via parse_season), the
+    slash form '2024/25', or the dash form already."""
+    if isinstance(season, int):
+        return "{}-{}".format(season, str(season + 1)[2:])
+    text = str(season)
+    if "/" in text:
+        start = int(text.split("/")[0])
+        return "{}-{}".format(start, str(start + 1)[2:])
+    return text
+
+
 def _session() -> requests.Session:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
@@ -75,7 +89,7 @@ class VaastavSource:
         captured_at: Optional[dt.datetime] = None,
         **_ignored,
     ) -> List[str]:
-        seasons = list(seasons or KNOWN_SEASONS)
+        seasons = [to_dash(s) for s in (seasons or KNOWN_SEASONS)]
         captured_at = captured_at or dt.datetime.utcnow().replace(microsecond=0)
         session = _session()
         done = set() if refetch else archived_seasons(archive)
