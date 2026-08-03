@@ -395,3 +395,20 @@ CREATE TABLE IF NOT EXISTS src_fpl_player_gw (
     archive_key                TEXT NOT NULL,
     PRIMARY KEY (season, source, element_id, event)
 );
+
+CREATE TABLE IF NOT EXISTS src_fpl_element_season (
+    season       TEXT NOT NULL,
+    element_id   INTEGER NOT NULL,
+    code         INTEGER,
+    first_name   TEXT,
+    second_name  TEXT,
+    web_name     TEXT,
+    element_type INTEGER,
+    team         INTEGER,
+    team_code    INTEGER,
+    now_cost     INTEGER,
+    total_points INTEGER,
+    minutes      INTEGER,
+    archive_key  TEXT NOT NULL,
+    PRIMARY KEY (season, element_id)
+);
