@@ -26,6 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--competition", help="comma-separated competition codes")
     ingest.add_argument("--season", help="comma-separated seasons, e.g. 2024/25,2023/24")
 
+    rebuild = subparsers.add_parser("rebuild", help="replay the archive into the warehouse")
+    rebuild.add_argument("--source", help="comma-separated source names")
+
     return parser
 
 
@@ -75,7 +78,26 @@ def _cmd_ingest(args) -> int:
     return 0 if total else 1
 
 
-_HANDLERS = {"ingest": _cmd_ingest}
+def _cmd_rebuild(args) -> int:
+    from .archive import RawArchive
+    from .warehouse import db, load
+
+    sources = [s.strip() for s in args.source.split(",")] if args.source else None
+    con = db.connect()
+    try:
+        written = load.rebuild(con, RawArchive(), sources=sources)
+    finally:
+        con.close()
+
+    if not written:
+        print("nothing to load")
+        return 0
+    for source, rows in sorted(written.items()):
+        print("{}: {} rows".format(source, rows))
+    return 0
+
+
+_HANDLERS = {"ingest": _cmd_ingest, "rebuild": _cmd_rebuild}
 
 
 if __name__ == "__main__":
