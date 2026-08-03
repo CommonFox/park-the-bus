@@ -127,6 +127,9 @@ def _cmd_coverage(args) -> int:
             "              WHEN 'uslc' THEN 'USLC' WHEN 'usl1' THEN 'USL1' ELSE league END, "
             "  season, count(*) "
             "  FROM src_asa_game GROUP BY 1, 2, 3 "
+            "UNION ALL "
+            "SELECT 'fpl', 'E0', season, count(*) "
+            "  FROM src_fpl_fixture GROUP BY 1, 2, 3 "
             "ORDER BY 1, 2, 3"
         ).fetchall()
         unresolved = con.execute("SELECT count(*) FROM unresolved_match").fetchone()[0]
