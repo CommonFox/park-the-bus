@@ -24,6 +24,13 @@ def test_parse_season_is_the_inverse_of_season_label():
         assert fd.parse_season(fd.season_label(year)) == year
 
 
+def test_parse_season_tolerates_dash_form():
+    """The CLI feeds --season through parse_season for every source, so it must
+    also accept vaastav's dash form."""
+    assert fd.parse_season("2024-25") == 2024
+    assert fd.parse_season("2024/25") == 2024
+
+
 def test_big_5_codes_are_all_known_competitions():
     for code in fd.BIG_5:
         assert code in fd.COMPETITIONS
