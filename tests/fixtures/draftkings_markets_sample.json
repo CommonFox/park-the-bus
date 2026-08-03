@@ -1,0 +1,38 @@
+{
+  "source": "draftkings", "endpoint": "markets", "league": "premier-league",
+  "captured_at": "2026-08-03T12:00:00Z",
+  "url": "https://sportsbook-nash.draftkings.com/sites/US-CO-SB/api/sportscontent/controldata/league/leagueSubcategory/v1/markets",
+  "fetched_at": "2026-08-03T12:00:00Z",
+  "data": {
+    "moneyline": {
+      "events": [
+        {"id": "34297694", "name": "Arsenal vs Wolves",
+         "startEventDate": "2026-08-21T19:00:00.0000000Z",
+         "participants": [{"name": "Arsenal", "venueRole": "Home"},
+                          {"name": "Wolves", "venueRole": "Away"}]},
+        {"id": "34297695", "name": "Everton vs Brighton",
+         "startEventDate": "2026-08-22T14:00:00.0000000Z",
+         "participants": [{"name": "Everton", "venueRole": "Home"},
+                          {"name": "Brighton", "venueRole": "Away"}]}
+      ],
+      "markets": [{"id": "M1", "eventId": "34297694"}, {"id": "M2", "eventId": "34297695"}],
+      "selections": [
+        {"marketId": "M1", "outcomeType": "Home", "displayOdds": {"decimal": "1.15"}},
+        {"marketId": "M1", "outcomeType": "Tie", "displayOdds": {"decimal": "8.00"}},
+        {"marketId": "M1", "outcomeType": "Away", "displayOdds": {"decimal": "13.00"}},
+        {"marketId": "M2", "outcomeType": "Home", "displayOdds": {"decimal": "2.10"}},
+        {"marketId": "M2", "outcomeType": "Tie", "displayOdds": {"decimal": "3.40"}},
+        {"marketId": "M2", "outcomeType": "Away", "displayOdds": {"decimal": "3.30"}}
+      ]
+    },
+    "totals": {
+      "events": [],
+      "markets": [{"id": "T1", "eventId": "34297694"}],
+      "selections": [
+        {"marketId": "T1", "outcomeType": "Over", "points": 2.5, "displayOdds": {"decimal": "1.54"}},
+        {"marketId": "T1", "outcomeType": "Under", "points": 2.5, "displayOdds": {"decimal": "2.35"}},
+        {"marketId": "T1", "outcomeType": "Over", "points": 3.5, "displayOdds": {"decimal": "3.00"}}
+      ]
+    }
+  }
+}

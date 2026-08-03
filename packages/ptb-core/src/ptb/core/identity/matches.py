@@ -234,3 +234,30 @@ def resolve_fpl(con: duckdb.DuckDBPyConnection) -> int:
         ) is not None:
             resolved += 1
     return resolved
+
+
+def resolve_draftkings(con: duckdb.DuckDBPyConnection) -> int:
+    """Resolve DraftKings events into dim_match. Idempotent.
+
+    Odds are snapshotted, so only the latest snapshot per event is resolved.
+    DraftKings events are upcoming Premier League matches, so they resolve
+    against the FPL forward fixtures (and, once played, football-data) already in
+    dim_match via the +/-36h window.
+    """
+    rows = con.execute(
+        "SELECT dk_event_id, season, kickoff_utc, home_team, away_team FROM ("
+        "  SELECT *, row_number() OVER "
+        "    (PARTITION BY dk_event_id ORDER BY captured_at DESC) AS rn "
+        "  FROM src_draftkings_odds WHERE kickoff_utc IS NOT NULL AND season IS NOT NULL"
+        ") WHERE rn = 1 ORDER BY kickoff_utc, dk_event_id"
+    ).fetchall()
+
+    resolved = 0
+    for event_id, season, kickoff, home, away in rows:
+        if resolve_match(
+            con, source="draftkings", source_match_id=str(event_id),
+            competition="E0", season=season, kickoff=kickoff,
+            home_team=home, away_team=away,
+        ) is not None:
+            resolved += 1
+    return resolved
