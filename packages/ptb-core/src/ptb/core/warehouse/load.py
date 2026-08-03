@@ -73,4 +73,8 @@ def rebuild(
         resolved = identity_matches.resolve_footballdata(con)
         log.info("resolved %d football-data matches into dim_match", resolved)
 
+    if written.get("understat"):
+        resolved = identity_matches.resolve_understat(con)
+        log.info("resolved %d understat matches into dim_match", resolved)
+
     return written

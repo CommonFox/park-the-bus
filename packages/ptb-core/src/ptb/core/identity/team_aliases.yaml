@@ -36,5 +36,7 @@
 "juventus": Juventus
 "paris sg": Paris Saint-Germain
 "psg": Paris Saint-Germain
+# Understat spellings that normalize differently from football-data canonicals
+"paris saint germain": Paris Saint-Germain
 "marseille": Olympique Marseille
 "lyon": Olympique Lyonnais

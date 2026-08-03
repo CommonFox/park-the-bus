@@ -146,3 +146,27 @@ def resolve_footballdata(con: duckdb.DuckDBPyConnection) -> int:
         ) is not None:
             resolved += 1
     return resolved
+
+
+def resolve_understat(con: duckdb.DuckDBPyConnection) -> int:
+    """Resolve every understat match into dim_match. Idempotent.
+
+    Big-5 matches resolve against football-data's existing dim_match rows via
+    the +/-36h window, which is the first cross-source match identity in the
+    project.
+    """
+    rows = con.execute(
+        "SELECT understat_match_id, competition, season, kickoff, home_team, away_team "
+        "FROM src_understat_match WHERE kickoff IS NOT NULL "
+        "ORDER BY kickoff, understat_match_id"
+    ).fetchall()
+
+    resolved = 0
+    for match_id, competition, season, kickoff, home, away in rows:
+        if resolve_match(
+            con, source="understat", source_match_id=str(match_id),
+            competition=competition, season=season, kickoff=kickoff,
+            home_team=home, away_team=away,
+        ) is not None:
+            resolved += 1
+    return resolved
