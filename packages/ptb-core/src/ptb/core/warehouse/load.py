@@ -85,4 +85,8 @@ def rebuild(
         resolved = identity_matches.resolve_fpl(con)
         log.info("resolved %d fpl fixtures into dim_match", resolved)
 
+    if written.get("draftkings"):
+        resolved = identity_matches.resolve_draftkings(con)
+        log.info("resolved %d draftkings events into dim_match", resolved)
+
     return written
