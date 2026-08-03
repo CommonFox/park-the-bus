@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("source", help="source name, or 'all'")
     ingest.add_argument("--competition", help="comma-separated competition codes")
     ingest.add_argument("--season", help="comma-separated seasons, e.g. 2024/25,2023/24")
+    ingest.add_argument("--refetch", action="store_true",
+                        help="re-fetch payloads already in the archive")
 
     rebuild = subparsers.add_parser("rebuild", help="replay the archive into the warehouse")
     rebuild.add_argument("--source", help="comma-separated source names")
@@ -70,6 +72,8 @@ def _cmd_ingest(args) -> int:
         options["competitions"] = [c.strip() for c in args.competition.split(",")]
     if args.season:
         options["seasons"] = [parse_season(s.strip()) for s in args.season.split(",")]
+    if args.refetch:
+        options["refetch"] = True
 
     total = 0
     for name in names:
