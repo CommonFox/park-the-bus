@@ -59,3 +59,31 @@ def test_rebuild_ignores_a_source_with_no_loader(con, tmp_path):
     archive.write("mystery", "thing", {"n": 1},
                   captured_at=dt.datetime(2026, 8, 2, 10, 15, 0))
     assert load.rebuild(con, archive) == {}
+
+
+def test_player_identity_tables_exist(tmp_path):
+    from ptb.core.warehouse import db
+
+    con = db.connect(tmp_path / "test.duckdb")
+    try:
+        names = {r[0] for r in con.execute(
+            "SELECT table_name FROM information_schema.tables").fetchall()}
+        assert {"dim_player", "map_player_source", "unresolved_player"} <= names
+        assert con.execute("SELECT nextval('seq_player_id')").fetchone()[0] == 1
+    finally:
+        con.close()
+
+
+def test_dim_player_allows_homonyms(tmp_path):
+    """Two different Danny Wards have played in the Premier League, so
+    normalized_name carries no UNIQUE constraint -- unlike dim_team."""
+    from ptb.core.warehouse import db
+
+    con = db.connect(tmp_path / "test.duckdb")
+    try:
+        con.execute(
+            "INSERT INTO dim_player (player_id, canonical_name, normalized_name) "
+            "VALUES (1, 'Danny Ward', 'danny ward'), (2, 'Danny Ward', 'danny ward')")
+        assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 2
+    finally:
+        con.close()
