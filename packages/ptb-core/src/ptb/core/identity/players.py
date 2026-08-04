@@ -183,3 +183,113 @@ def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
         )
         created += 1
     return created
+
+
+def _fpl_candidates(con: duckdb.DuckDBPyConnection, season: str) -> List[Candidate]:
+    """Spine players who appeared in the Premier League in this season.
+
+    Blocking by season keeps each comparison set at roughly 600 players, which
+    makes the pairwise cost negligible and removes most homonym risk for free.
+    """
+    rows = con.execute(
+        "SELECT p.player_id, p.canonical_name, p.birth_date, p.opta_code, t.name "
+        "FROM dim_player p "
+        "JOIN map_player_source m "
+        "  ON m.player_id = p.player_id AND m.source = 'fpl' "
+        "JOIN src_fpl_element e "
+        "  ON CAST(e.code AS VARCHAR) = m.source_player_id AND e.season = ? "
+        "JOIN src_fpl_team t ON t.season = e.season AND t.team_id = e.team "
+        "ORDER BY p.player_id",
+        [season],
+    ).fetchall()
+    return [Candidate(*row) for row in rows]
+
+
+def _create_player(
+    con: duckdb.DuckDBPyConnection,
+    name: str,
+    season: str,
+    birth_date: Optional[dt.date] = None,
+) -> int:
+    player_id = con.execute("SELECT nextval('seq_player_id')").fetchone()[0]
+    con.execute(
+        "INSERT INTO dim_player (player_id, canonical_name, normalized_name, "
+        "birth_date, first_seen_season, last_seen_season) VALUES (?, ?, ?, ?, ?, ?)",
+        [player_id, name, normalize_name(name), birth_date, season, season],
+    )
+    return player_id
+
+
+def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
+    """rows: (source_player_id, name, competition, season, team_name).
+
+    Returns the number matched into the spine.
+
+    Blocking is by (competition, season), not season alone. The spine is
+    Premier League only, so comparing a La Liga player against it could produce
+    a confident wrong match on a similar name -- outside E0 there is simply no
+    candidate set, and the player becomes a new dim_player row.
+
+    Rows arrive ordered by season, so a player active across several seasons is
+    decided by their earliest appearance and skipped thereafter.
+    """
+    candidate_cache = {}
+    seen = set()
+    matched = 0
+
+    for source_player_id, name, competition, season, team_name in rows:
+        key = str(source_player_id)
+        if key in seen or not name:
+            continue
+        seen.add(key)
+
+        block = (competition, season)
+        if block not in candidate_cache:
+            candidate_cache[block] = (
+                _fpl_candidates(con, season) if competition == "E0" else []
+            )
+
+        result = match_player(
+            candidate_cache[block],
+            name=name, team_name=team_name, birth_date=None, opta_code=None,
+        )
+
+        if result.reason is not None:
+            con.execute(
+                "INSERT OR REPLACE INTO unresolved_player "
+                "(source, source_player_id, reason, detail) VALUES (?, ?, ?, ?)",
+                [source, key, result.reason, result.detail],
+            )
+            continue
+
+        if result.player_id is None:
+            player_id, method, confidence = _create_player(con, name, season), "created", 1.0
+        else:
+            player_id = result.player_id
+            method, confidence = result.method, result.confidence
+            matched += 1
+
+        con.execute(
+            "INSERT OR REPLACE INTO map_player_source (player_id, source, "
+            "source_player_id, method, confidence) VALUES (?, ?, ?, ?, ?)",
+            [player_id, source, key, method, confidence],
+        )
+    return matched
+
+
+def resolve_understat_players(con: duckdb.DuckDBPyConnection) -> int:
+    """Match Understat shot-takers into dim_player. Idempotent.
+
+    A player can move club mid-season, so the modal team across their shots is
+    used rather than any single shot's.
+    """
+    rows = con.execute(
+        "SELECT s.player_id, mode(s.player) AS player_name, m.competition, m.season, "
+        "       mode(s.team) AS team_name "
+        "FROM src_understat_shot s "
+        "JOIN src_understat_match m ON m.understat_match_id = s.understat_match_id "
+        "WHERE s.player_id IS NOT NULL "
+        "GROUP BY s.player_id, m.competition, m.season "
+        "ORDER BY m.season, s.player_id"
+    ).fetchall()
+    return _resolve_source_players(con, "understat", rows)

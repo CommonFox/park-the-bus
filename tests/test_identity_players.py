@@ -132,3 +132,98 @@ def test_two_players_of_the_same_name_split_by_birth_date():
         birth_date=dt.date(1990, 12, 1), opta_code=None)
     assert result.player_id == 2
     assert result.method == "name_dob"
+
+
+def _understat_match(con, match_id, season, competition="E0"):
+    con.execute(
+        "INSERT OR REPLACE INTO src_understat_match (understat_match_id, competition, "
+        "season, home_team, away_team, archive_key) VALUES (?, ?, ?, 'Arsenal', 'Wolves', 'k')",
+        [match_id, competition, season])
+
+
+def _understat_shot(con, shot_id, match_id, player_id, player, team):
+    con.execute(
+        "INSERT OR REPLACE INTO src_understat_shot (understat_shot_id, understat_match_id, "
+        "minute, player, player_id, team, home_away, archive_key) "
+        "VALUES (?, ?, 10, ?, ?, ?, 'h', 'k')",
+        [shot_id, match_id, player, player_id, team])
+
+
+def test_understat_player_matches_the_fpl_spine(con):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+
+    assert players.resolve_understat_players(con) == 1
+    row = con.execute(
+        "SELECT player_id, method FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '647'").fetchone()
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 223094").fetchone()[0]
+    assert row[0] == fpl_player_id
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
+
+
+def test_a_shortened_fpl_name_still_matches(con):
+    """FPL stores 'Gabriel Jesus'; Understat stores the full legal name."""
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 12, 205651, "Gabriel", "Jesus", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "700", "Gabriel Fernando de Jesus", "Arsenal")
+
+    assert players.resolve_understat_players(con) == 1
+
+
+def test_a_player_absent_from_fpl_gets_a_new_row(con):
+    """A La Liga player has no FPL code. Creating the row is how the dimension
+    grows beyond the Premier League -- it is not a resolution failure."""
+    _understat_match(con, "2001", "2024/25", competition="SP1")
+    _understat_shot(con, "s1", "2001", "900", "Robert Lewandowski", "Barcelona")
+
+    assert players.resolve_understat_players(con) == 0
+    row = con.execute(
+        "SELECT p.canonical_name, m.method FROM dim_player p "
+        "JOIN map_player_source m ON m.player_id = p.player_id "
+        "WHERE m.source = 'understat'").fetchone()
+    assert row == ("Robert Lewandowski", "created")
+
+
+def test_an_ambiguous_understat_player_is_recorded_not_guessed(con):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 20, 111111, "Danny", "Ward", 1)
+    _fpl_element(con, "2024/25", 21, 222222, "Danny", "Ward", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "800", "Danny Ward", "Arsenal")
+
+    assert players.resolve_understat_players(con) == 0
+    assert con.execute(
+        "SELECT reason FROM unresolved_player WHERE source = 'understat'"
+    ).fetchone()[0] == players.AMBIGUOUS
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
+    ).fetchone()[0] == 0
+
+
+def test_a_player_in_two_seasons_maps_once(con):
+    _fpl_team(con, "2023/24", 1, "Arsenal")
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2023/24", 7, 223094, "Bukayo", "Saka", 1)
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2023/24")
+    _understat_match(con, "1002", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+    _understat_shot(con, "s2", "1002", "647", "Bukayo Saka", "Arsenal")
+
+    players.resolve_understat_players(con)
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
+    ).fetchone()[0] == 1
