@@ -1,0 +1,8 @@
+{
+  "source": "footballdata",
+  "competition": "E0",
+  "season": "2024/25",
+  "url": "https://www.football-data.co.uk/mmz4281/2425/E0.csv",
+  "fetched_at": "2026-08-03T10:15:00Z",
+  "csv": "Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,FTR,B365H,B365D,B365A,PSH,PSD,PSA,MaxH,MaxD,MaxA,AvgH,AvgD,AvgA,B365CH,B365CD,B365CA,PSCH,PSCD,PSCA,AvgCH,AvgCD,AvgCA,B365>2.5,B365<2.5,Avg>2.5,Avg<2.5,AvgC>2.5,AvgC<2.5,AHh,B365AHH,B365AHA,PAHH,PAHA,AvgAHH,AvgAHA,AHCh,AvgCAHH,AvgCAHA,PCAHH,PCAHA\nE0,17/08/2024,Arsenal,Wolves,2,0,H,1.25,6.50,11.00,1.26,6.60,12.50,1.28,6.80,13.00,1.25,6.40,11.50,1.22,7.00,13.00,1.23,7.10,13.50,1.21,6.90,12.80,1.80,2.00,1.83,1.98,1.85,1.97,-1.5,1.95,1.92,1.96,1.94,1.93,1.90,-1.75,1.99,1.88,2.01,1.86\nE0,17/08/2024,Everton,Brighton,0,3,A,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n"
+}

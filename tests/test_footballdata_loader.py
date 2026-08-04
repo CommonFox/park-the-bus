@@ -44,7 +44,7 @@ def test_load_maps_columns_correctly(con, payload):
     loader.load_footballdata(con, payload, "some/key.json.gz")
     row = con.execute(
         "SELECT season, kickoff_time, home_goals, away_goals, result, "
-        "       home_shots, away_shots, home_corners, referee, odds_home "
+        "       home_shots, away_shots, home_corners, referee "
         "FROM src_footballdata_match WHERE home_team = 'Arsenal'"
     ).fetchone()
 
@@ -54,7 +54,6 @@ def test_load_maps_columns_correctly(con, payload):
     assert (row[5], row[6]) == (20, 6)
     assert row[7] == 10
     assert row[8] == "S Hooper"
-    assert row[9] == pytest.approx(1.25)
 
 
 def test_loading_twice_changes_nothing(con, payload):
