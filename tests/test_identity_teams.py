@@ -70,3 +70,14 @@ def test_distinct_clubs_get_distinct_ids(con):
     a = teams.resolve_team(con, "Man United", source="footballdata")
     b = teams.resolve_team(con, "Man City", source="footballdata")
     assert a != b
+
+
+def test_normalize_folds_non_decomposing_letters():
+    """NFKD leaves these letters alone -- they are distinct letters, not
+    accented ones -- so they need an explicit translation."""
+    from ptb.core.identity.text import normalize_name
+
+    assert normalize_name("Ødegaard") == normalize_name("Odegaard")
+    assert normalize_name("Łukasz") == normalize_name("Lukasz")
+    assert normalize_name("Đorđević") == normalize_name("Dordevic")
+    assert normalize_name("Weiß") == "weiss"
