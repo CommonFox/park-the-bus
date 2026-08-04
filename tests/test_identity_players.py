@@ -71,3 +71,13 @@ def test_spine_carries_birth_date_and_opta_code(con):
     players.build_fpl_spine(con)
     row = con.execute("SELECT birth_date, opta_code FROM dim_player").fetchone()
     assert row == (dt.date(2001, 9, 5), "p223094")
+
+
+def test_build_fpl_spine_is_idempotent(con):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+
+    assert players.build_fpl_spine(con) == 1
+    assert players.build_fpl_spine(con) == 0
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
+    assert con.execute("SELECT count(*) FROM map_player_source").fetchone()[0] == 1

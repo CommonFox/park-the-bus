@@ -23,6 +23,10 @@ AMBIGUOUS = "ambiguous"
 def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
     """Create one dim_player row per distinct FPL code. Returns rows created.
 
+    Idempotent: a code already mapped in map_player_source is skipped, the
+    same check-before-create shape as resolve_match. Rerunning against
+    unchanged src_fpl_element data therefore creates nothing and returns 0.
+
     birth_date and opta_code are taken as the latest non-null across seasons
     rather than the latest season's value: FPL only began publishing them
     recently, so the most recent season is not reliably the populated one.
@@ -39,7 +43,16 @@ def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
         "GROUP BY code ORDER BY code"
     ).fetchall()
 
+    created = 0
     for code, canonical, birth_date, opta_code, first_season, last_season in rows:
+        existing = con.execute(
+            "SELECT player_id FROM map_player_source "
+            "WHERE source = 'fpl' AND source_player_id = ?",
+            [str(code)],
+        ).fetchone()
+        if existing is not None:
+            continue
+
         player_id = con.execute("SELECT nextval('seq_player_id')").fetchone()[0]
         con.execute(
             "INSERT INTO dim_player (player_id, canonical_name, normalized_name, "
@@ -53,4 +66,5 @@ def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
             "method, confidence) VALUES (?, ?, ?, ?, ?)",
             [player_id, "fpl", str(code), "fpl_code", 1.0],
         )
-    return len(rows)
+        created += 1
+    return created
