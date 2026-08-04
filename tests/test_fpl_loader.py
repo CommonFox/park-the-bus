@@ -116,3 +116,30 @@ def test_element_history_is_idempotent(con):
     _load(con, "fpl_element_sample.json")
     _load(con, "fpl_element_sample.json")
     assert con.execute("SELECT count(*) FROM src_fpl_player_gw").fetchone()[0] == 2
+
+
+def test_bootstrap_loads_birth_date_and_opta_code(con):
+    """Both are identity signal for cross-source player matching, and both are
+    in every archived bootstrap payload."""
+    _load(con, "fpl_bootstrap_sample.json")
+    row = con.execute(
+        "SELECT birth_date, opta_code FROM src_fpl_element "
+        "WHERE season = '2024/25' AND element_id = 11"
+    ).fetchone()
+    assert row == (dt.date(2001, 9, 5), "p223094")
+
+
+def test_bootstrap_tolerates_missing_birth_date(con):
+    """FPL only began publishing these recently, so historical payloads lack
+    them and must still load."""
+    payload = json.loads(
+        (FIX / "fpl_bootstrap_sample.json").read_text(encoding="utf-8"))
+    for element in payload["data"]["elements"]:
+        element.pop("birth_date", None)
+        element.pop("opta_code", None)
+    loader.load_fpl(con, payload, "fpl/no-birth-date")
+    row = con.execute(
+        "SELECT birth_date, opta_code FROM src_fpl_element "
+        "WHERE season = '2024/25' AND element_id = 11"
+    ).fetchone()
+    assert row == (None, None)

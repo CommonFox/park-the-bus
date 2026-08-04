@@ -28,7 +28,8 @@
        "total_points": 200, "form": "5.5", "selected_by_percent": "40.2",
        "status": "a", "minutes": 3000, "goals_scored": 12, "assists": 15,
        "clean_sheets": 10, "bonus": 25, "bps": 700, "expected_goals": "10.5",
-       "expected_assists": "12.1", "expected_goal_involvements": "22.6"}
+       "expected_assists": "12.1", "expected_goal_involvements": "22.6",
+       "birth_date": "2001-09-05", "opta_code": "p223094"}
     ]
   }
 }

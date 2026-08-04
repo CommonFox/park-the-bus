@@ -331,6 +331,8 @@ CREATE TABLE IF NOT EXISTS src_fpl_element (
     expected_goals             DOUBLE,
     expected_assists           DOUBLE,
     expected_goal_involvements DOUBLE,
+    birth_date                 DATE,
+    opta_code                  TEXT,
     archive_key                TEXT NOT NULL,
     PRIMARY KEY (season, element_id)
 );
