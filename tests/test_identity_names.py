@@ -45,3 +45,41 @@ def test_similarity_is_symmetric():
 
 def test_empty_name_scores_zero():
     assert similarity("", "Bukayo Saka") == 0.0
+
+
+from ptb.core.identity.names import score_candidate
+
+
+def test_score_with_only_a_name_is_the_name_similarity():
+    assert score_candidate(
+        name_similarity=0.9, team_agrees=None, birth_date_agrees=None,
+    ) == pytest.approx(0.9)
+
+
+def test_a_perfect_match_scores_one():
+    assert score_candidate(
+        name_similarity=1.0, team_agrees=True, birth_date_agrees=True,
+    ) == pytest.approx(1.0)
+
+
+def test_a_missing_birth_date_does_not_penalise():
+    """birth_date is absent for 60% of players. Scoring an absent feature as
+    zero would sink most true matches below the threshold."""
+    with_dob = score_candidate(
+        name_similarity=1.0, team_agrees=True, birth_date_agrees=True)
+    without_dob = score_candidate(
+        name_similarity=1.0, team_agrees=True, birth_date_agrees=None)
+    assert without_dob == pytest.approx(with_dob)
+
+
+def test_a_disagreeing_birth_date_does_penalise():
+    """Absent is not the same as contradicted."""
+    assert score_candidate(
+        name_similarity=1.0, team_agrees=True, birth_date_agrees=False,
+    ) < 0.9
+
+
+def test_a_wrong_team_pulls_a_perfect_name_down():
+    assert score_candidate(
+        name_similarity=1.0, team_agrees=False, birth_date_agrees=None,
+    ) == pytest.approx(0.60 / 0.85)

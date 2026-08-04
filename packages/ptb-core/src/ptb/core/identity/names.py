@@ -8,7 +8,7 @@ over the cross product.
 """
 from __future__ import annotations
 
-from typing import Set
+from typing import Optional, Set
 
 from rapidfuzz.distance import JaroWinkler
 
@@ -42,3 +42,38 @@ def similarity(left: str, right: str) -> float:
         for a in left_variants
         for b in right_variants
     )
+
+
+# Name carries most of the signal and is the only feature always available.
+# Position is deliberately absent: no source in scope publishes a vocabulary
+# comparable to FPL's element_type, and inventing a mapping would fabricate
+# signal the data does not contain.
+FEATURE_WEIGHTS = {
+    "name": 0.60,
+    "team": 0.25,
+    "birth_date": 0.15,
+}
+
+
+def score_candidate(
+    *,
+    name_similarity: float,
+    team_agrees: Optional[bool],
+    birth_date_agrees: Optional[bool],
+) -> float:
+    """Weighted score over the features available for this pair.
+
+    A feature missing on either side is excluded and the remaining weights are
+    renormalized, rather than scored as zero. birth_date is absent for 60% of
+    players, so scoring absence as disagreement would sink most true matches.
+    Absent and contradicted are different things and score differently.
+    """
+    features = {"name": float(name_similarity)}
+    if team_agrees is not None:
+        features["team"] = 1.0 if team_agrees else 0.0
+    if birth_date_agrees is not None:
+        features["birth_date"] = 1.0 if birth_date_agrees else 0.0
+
+    total_weight = sum(FEATURE_WEIGHTS[name] for name in features)
+    weighted = sum(FEATURE_WEIGHTS[name] * value for name, value in features.items())
+    return weighted / total_weight
