@@ -223,7 +223,7 @@ def _create_player(
 def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
     """rows: (source_player_id, name, competition, season, team_name).
 
-    Returns the number matched into the spine.
+    Returns the number matched into the spine on this call.
 
     Blocking is by (competition, season), not season alone. The spine is
     Premier League only, so comparing a La Liga player against it could produce
@@ -232,6 +232,13 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
 
     Rows arrive ordered by season, so a player active across several seasons is
     decided by their earliest appearance and skipped thereafter.
+
+    Idempotent: a source player already present in map_player_source is
+    skipped outright, the same check-before-create guard as resolve_match
+    (identity/matches.py). It sits ahead of the match/create/ambiguous
+    dispatch so it covers all three outcomes, not just the created branch --
+    rerunning against unchanged source data therefore creates nothing new and
+    returns 0.
     """
     candidate_cache = {}
     seen = set()
@@ -242,6 +249,14 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
         if key in seen or not name:
             continue
         seen.add(key)
+
+        existing = con.execute(
+            "SELECT player_id FROM map_player_source "
+            "WHERE source = ? AND source_player_id = ?",
+            [source, key],
+        ).fetchone()
+        if existing is not None:
+            continue
 
         block = (competition, season)
         if block not in candidate_cache:

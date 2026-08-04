@@ -227,3 +227,21 @@ def test_a_player_in_two_seasons_maps_once(con):
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
     ).fetchone()[0] == 1
+
+
+def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
+    """A player with no FPL candidate (non-E0) takes the 'created' branch.
+
+    Rerunning must not mint a second dim_player row for the same source
+    player -- the same check-before-create contract as build_fpl_spine, this
+    time covering the created outcome rather than only the matched one.
+    """
+    _understat_match(con, "2001", "2024/25", competition="SP1")
+    _understat_shot(con, "s1", "2001", "900", "Robert Lewandowski", "Barcelona")
+
+    assert players.resolve_understat_players(con) == 0
+    assert players.resolve_understat_players(con) == 0
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
+    ).fetchone()[0] == 1
