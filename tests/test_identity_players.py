@@ -81,3 +81,54 @@ def test_build_fpl_spine_is_idempotent(con):
     assert players.build_fpl_spine(con) == 0
     assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
     assert con.execute("SELECT count(*) FROM map_player_source").fetchone()[0] == 1
+
+
+def _candidate(player_id=1, name="Bukayo Saka", birth_date=None,
+               opta_code=None, team_name="Arsenal"):
+    return players.Candidate(player_id, name, birth_date, opta_code, team_name)
+
+
+def test_opta_code_wins_outright():
+    result = players.match_player(
+        [_candidate(opta_code="p223094"), _candidate(player_id=2, name="Someone Else")],
+        name="Totally Different", team_name=None,
+        birth_date=None, opta_code="p223094")
+    assert (result.player_id, result.method, result.confidence) == (1, "opta_code", 1.00)
+
+
+def test_name_plus_birth_date_matches():
+    result = players.match_player(
+        [_candidate(birth_date=dt.date(2001, 9, 5))],
+        name="Bukayo Saka", team_name=None,
+        birth_date=dt.date(2001, 9, 5), opta_code=None)
+    assert (result.method, result.confidence) == ("name_dob", 0.99)
+
+
+def test_name_plus_team_matches():
+    result = players.match_player(
+        [_candidate()], name="Bukayo Saka", team_name="Arsenal",
+        birth_date=None, opta_code=None)
+    assert (result.method, result.confidence) == ("name_team_season", 0.95)
+
+
+def test_two_players_of_the_same_name_at_the_same_club_are_ambiguous():
+    """The homonym case. Two Danny Wards at one club cannot be separated by
+    name and team, so the tier must not fire and the fallback must refuse."""
+    result = players.match_player(
+        [_candidate(player_id=1, name="Danny Ward"),
+         _candidate(player_id=2, name="Danny Ward")],
+        name="Danny Ward", team_name="Arsenal",
+        birth_date=None, opta_code=None)
+    assert result.player_id is None
+    assert result.reason == players.AMBIGUOUS
+
+
+def test_two_players_of_the_same_name_split_by_birth_date():
+    """Same names, same club, but a birth date separates them cleanly."""
+    result = players.match_player(
+        [_candidate(player_id=1, name="Danny Ward", birth_date=dt.date(1993, 6, 22)),
+         _candidate(player_id=2, name="Danny Ward", birth_date=dt.date(1990, 12, 1))],
+        name="Danny Ward", team_name="Arsenal",
+        birth_date=dt.date(1990, 12, 1), opta_code=None)
+    assert result.player_id == 2
+    assert result.method == "name_dob"

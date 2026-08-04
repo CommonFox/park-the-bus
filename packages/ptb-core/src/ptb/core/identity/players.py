@@ -9,15 +9,130 @@ the reason instead of guessing -- the same contract as match resolution.
 """
 from __future__ import annotations
 
+import datetime as dt
 import logging
+from typing import List, NamedTuple, Optional, Sequence
 
 import duckdb
 
+from .names import score_candidate, similarity
 from .text import normalize_name
 
 log = logging.getLogger(__name__)
 
 AMBIGUOUS = "ambiguous"
+
+SCORE_THRESHOLD = 0.80
+SCORE_MARGIN = 0.10
+
+
+class Candidate(NamedTuple):
+    player_id: int
+    canonical_name: str
+    birth_date: Optional[dt.date]
+    opta_code: Optional[str]
+    team_name: Optional[str]
+
+
+class Match(NamedTuple):
+    """player_id set means matched. reason set means refuse and record.
+
+    Both unset means no candidate was good enough, which is not a failure --
+    it is how a player who has never appeared in FPL enters the dimension.
+    """
+    player_id: Optional[int] = None
+    method: Optional[str] = None
+    confidence: Optional[float] = None
+    reason: Optional[str] = None
+    detail: Optional[str] = None
+
+
+def match_player(
+    candidates: Sequence[Candidate],
+    *,
+    name: str,
+    team_name: Optional[str],
+    birth_date: Optional[dt.date],
+    opta_code: Optional[str],
+) -> Match:
+    """Deterministic tiers first, then the scored fallback."""
+    normalized = normalize_name(name)
+
+    if opta_code:
+        for candidate in candidates:
+            if candidate.opta_code and candidate.opta_code == opta_code:
+                return Match(candidate.player_id, "opta_code", 1.00)
+
+    if birth_date is not None:
+        for candidate in candidates:
+            if (candidate.birth_date == birth_date
+                    and normalize_name(candidate.canonical_name) == normalized):
+                return Match(candidate.player_id, "name_dob", 0.99)
+
+    if team_name is not None:
+        normalized_team = normalize_name(team_name)
+        exact = [
+            candidate.player_id for candidate in candidates
+            if normalize_name(candidate.canonical_name) == normalized
+            and candidate.team_name is not None
+            and normalize_name(candidate.team_name) == normalized_team
+        ]
+        # More than one means genuine homonyms at one club: the tier cannot
+        # separate them, so it declines and leaves it to the fallback.
+        if len(exact) == 1:
+            return Match(exact[0], "name_team_season", 0.95)
+
+    return _scored_match(
+        candidates, name=name, team_name=team_name, birth_date=birth_date)
+
+
+def _scored_match(
+    candidates: Sequence[Candidate],
+    *,
+    name: str,
+    team_name: Optional[str],
+    birth_date: Optional[dt.date],
+) -> Match:
+    """Best candidate above the threshold, provided it clears the runner-up.
+
+    The margin is what stops a confident-looking wrong match when two players
+    in one block score alike -- exactly the homonym case the tiers declined.
+    """
+    normalized_team = normalize_name(team_name) if team_name is not None else None
+
+    scored: List[tuple] = []
+    for candidate in candidates:
+        team_agrees = None
+        if normalized_team is not None and candidate.team_name is not None:
+            team_agrees = normalize_name(candidate.team_name) == normalized_team
+        birth_date_agrees = None
+        if birth_date is not None and candidate.birth_date is not None:
+            birth_date_agrees = candidate.birth_date == birth_date
+
+        scored.append((
+            score_candidate(
+                name_similarity=similarity(name, candidate.canonical_name),
+                team_agrees=team_agrees,
+                birth_date_agrees=birth_date_agrees,
+            ),
+            candidate.player_id,
+        ))
+
+    if not scored:
+        return Match()
+
+    scored.sort(reverse=True)
+    best_score, best_id = scored[0]
+    if best_score < SCORE_THRESHOLD:
+        return Match()
+
+    runner_up = scored[1][0] if len(scored) > 1 else 0.0
+    if best_score - runner_up < SCORE_MARGIN:
+        return Match(
+            reason=AMBIGUOUS,
+            detail="{:.3f} vs {:.3f}".format(best_score, runner_up),
+        )
+    return Match(best_id, "scored", best_score)
 
 
 def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
