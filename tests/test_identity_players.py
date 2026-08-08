@@ -379,3 +379,26 @@ def test_an_override_can_force_a_non_match(con, tmp_path):
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
     ).fetchone()[0] == 0
+
+
+def test_rebuild_resolves_players_after_every_source_loads(con, tmp_path):
+    """Player matching is cross-source, so it cannot run inside the per-source
+    branches the way match resolution does -- the spine must already exist."""
+    from ptb.core.archive import LocalBackend, RawArchive
+    from ptb.core.warehouse import load
+
+    archive = RawArchive(LocalBackend(tmp_path / "archive"))
+    payload = {
+        "source": "fpl", "endpoint": "bootstrap", "season": "2024/25",
+        "data": {
+            "teams": [{"id": 1, "name": "Arsenal", "short_name": "ARS"}],
+            "element_types": [], "events": [],
+            "elements": [{"id": 11, "code": 223094, "web_name": "Saka",
+                          "first_name": "Bukayo", "second_name": "Saka",
+                          "team": 1, "element_type": 3}],
+        },
+    }
+    archive.write("fpl", "bootstrap", payload)
+
+    load.rebuild(con, archive)
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1

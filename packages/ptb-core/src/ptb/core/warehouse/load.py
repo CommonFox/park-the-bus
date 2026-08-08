@@ -89,4 +89,13 @@ def rebuild(
         resolved = identity_matches.resolve_draftkings(con)
         log.info("resolved %d draftkings events into dim_match", resolved)
 
+    # Player matching is inherently cross-source -- an Understat player is
+    # matched against the FPL spine -- so it runs once after every source has
+    # loaded, not inside the per-source branches above.
+    if written:
+        from ..identity import players as identity_players
+
+        matched = identity_players.resolve_players(con)
+        log.info("matched %d source players into dim_player", matched)
+
     return written

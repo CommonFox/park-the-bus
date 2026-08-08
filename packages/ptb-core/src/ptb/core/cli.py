@@ -136,6 +136,10 @@ def _cmd_coverage(args) -> int:
             "ORDER BY 1, 2, 3"
         ).fetchall()
         unresolved = con.execute("SELECT count(*) FROM unresolved_match").fetchone()[0]
+        unresolved_players = con.execute(
+            "SELECT count(*) FROM unresolved_player").fetchone()[0]
+        players_mapped = con.execute(
+            "SELECT count(*) FROM map_player_source").fetchone()[0]
     finally:
         con.close()
 
@@ -148,6 +152,11 @@ def _cmd_coverage(args) -> int:
         print("{:<14} {:<6} {:<9} {:>8}".format(source, competition, season, count))
     if unresolved:
         print("\n{} unresolved match(es) -- see the unresolved_match table".format(unresolved))
+    if players_mapped:
+        print("\n{} player mapping(s) across sources".format(players_mapped))
+    if unresolved_players:
+        print("{} unresolved player(s) -- see the unresolved_player table".format(
+            unresolved_players))
     return 0
 
 
