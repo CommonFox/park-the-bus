@@ -308,3 +308,25 @@ def resolve_understat_players(con: duckdb.DuckDBPyConnection) -> int:
         "ORDER BY m.season, s.player_id"
     ).fetchall()
     return _resolve_source_players(con, "understat", rows)
+
+
+def resolve_fotmob_players(con: duckdb.DuckDBPyConnection) -> int:
+    """Match FotMob leaderboard players into dim_player. Idempotent.
+
+    A player appears on every stat board for their league and season, so rows
+    are collapsed to one per (player, season). Team names live on the team
+    boards rather than the player rows, hence the join.
+    """
+    rows = con.execute(
+        "SELECT p.fotmob_player_id, mode(p.player_name) AS player_name, "
+        "       CASE p.league_id WHEN 47 THEN 'E0' WHEN 48 THEN 'E1' END AS competition, "
+        "       p.season, mode(t.team_name) AS team_name "
+        "FROM src_fotmob_player_stat p "
+        "LEFT JOIN src_fotmob_team_stat t "
+        "  ON t.league_id = p.league_id AND t.season = p.season "
+        " AND t.fotmob_team_id = p.fotmob_team_id "
+        "WHERE p.fotmob_player_id IS NOT NULL "
+        "GROUP BY p.fotmob_player_id, p.league_id, p.season "
+        "ORDER BY p.season, p.fotmob_player_id"
+    ).fetchall()
+    return _resolve_source_players(con, "fotmob", rows)

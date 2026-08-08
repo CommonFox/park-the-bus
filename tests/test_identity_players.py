@@ -245,3 +245,65 @@ def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
     ).fetchone()[0] == 1
+
+
+def _fotmob_player(con, player_id, name, team_id, season="2024/25",
+                   league_id=47, stat="expected_goals"):
+    con.execute(
+        "INSERT OR REPLACE INTO src_fotmob_player_stat (league_id, season, stat_name, "
+        "fotmob_player_id, fotmob_team_id, player_name, value, archive_key) "
+        "VALUES (?, ?, ?, ?, ?, ?, 1.0, 'k')",
+        [league_id, season, stat, player_id, team_id, name])
+
+
+def _fotmob_team(con, team_id, name, season="2024/25", league_id=47):
+    con.execute(
+        "INSERT OR REPLACE INTO src_fotmob_team_stat (league_id, season, stat_name, "
+        "fotmob_team_id, team_name, value, archive_key) "
+        "VALUES (?, ?, 'expected_goals', ?, ?, 1.0, 'k')",
+        [league_id, season, team_id, name])
+
+
+def test_fotmob_player_matches_the_fpl_spine(con):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    _fotmob_team(con, 9825, "Arsenal")
+    _fotmob_player(con, 737066, "Bukayo Saka", 9825)
+
+    assert players.resolve_fotmob_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 223094").fetchone()[0]
+    assert con.execute(
+        "SELECT player_id FROM map_player_source WHERE source = 'fotmob'"
+    ).fetchone()[0] == fpl_player_id
+
+
+def test_fotmob_player_appearing_in_many_stat_boards_maps_once(con):
+    """One player appears on every leaderboard for their league and season."""
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    _fotmob_team(con, 9825, "Arsenal")
+    _fotmob_player(con, 737066, "Bukayo Saka", 9825, stat="expected_goals")
+    _fotmob_player(con, 737066, "Bukayo Saka", 9825, stat="goals")
+    _fotmob_player(con, 737066, "Bukayo Saka", 9825, stat="assists")
+
+    assert players.resolve_fotmob_players(con) == 1
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'fotmob'"
+    ).fetchone()[0] == 1
+
+
+def test_championship_players_are_resolved_separately(con):
+    """League 48 is the Championship. Its players have no Premier League FPL
+    candidate, so they enter the dimension as new rows."""
+    _fotmob_team(con, 8678, "Leeds", league_id=48)
+    _fotmob_player(con, 999001, "Some Championship Player", 8678, league_id=48)
+
+    assert players.resolve_fotmob_players(con) == 0
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'fotmob'"
+    ).fetchone()[0] == 1
