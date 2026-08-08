@@ -44,6 +44,15 @@ def _ts(value: Any) -> Optional[dt.datetime]:
         return None
 
 
+def _date(value: Any) -> Optional[dt.date]:
+    if not value:
+        return None
+    try:
+        return dt.date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
+
+
 def _load_bootstrap(con, payload, archive_key) -> int:
     season = payload["season"]
     data = payload["data"]
@@ -84,6 +93,7 @@ def _load_bootstrap(con, payload, archive_key) -> int:
                  _i(e.get("goals_scored")), _i(e.get("assists")), _i(e.get("clean_sheets")),
                  _i(e.get("bonus")), _i(e.get("bps")), _f(e.get("expected_goals")),
                  _f(e.get("expected_assists")), _f(e.get("expected_goal_involvements")),
+                 _date(e.get("birth_date")), e.get("opta_code"),
                  archive_key] for e in data.get("elements", []) if e.get("id") is not None]
     if elements:
         con.executemany(
@@ -91,8 +101,9 @@ def _load_bootstrap(con, payload, archive_key) -> int:
             "first_name, second_name, team, element_type, now_cost, total_points, form, "
             "selected_by_percent, status, minutes, goals_scored, assists, clean_sheets, "
             "bonus, bps, expected_goals, expected_assists, expected_goal_involvements, "
+            "birth_date, opta_code, "
             "archive_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "?, ?, ?, ?, ?)", elements)
+            "?, ?, ?, ?, ?, ?, ?)", elements)
 
     return len(teams) + len(positions) + len(events) + len(elements)
 

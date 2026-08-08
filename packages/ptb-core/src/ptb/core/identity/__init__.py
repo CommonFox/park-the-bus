@@ -1,5 +1,5 @@
-from . import teams, text
+from . import teams, text, names
 
-from . import matches  # noqa: F401,E402
+from . import matches, players  # noqa: F401,E402
 
-__all__ = ["teams", "text", "matches"]
+__all__ = ["teams", "text", "names", "matches", "players"]
