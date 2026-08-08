@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+from pathlib import Path
 from typing import List, NamedTuple, Optional, Sequence
 
 import duckdb
+import yaml
 
 from .names import score_candidate, similarity
 from .text import normalize_name
@@ -330,3 +332,68 @@ def resolve_fotmob_players(con: duckdb.DuckDBPyConnection) -> int:
         "ORDER BY p.season, p.fotmob_player_id"
     ).fetchall()
     return _resolve_source_players(con, "fotmob", rows)
+
+
+OVERRIDES_PATH = Path(__file__).with_name("player_overrides.yaml")
+
+
+def apply_overrides(con: duckdb.DuckDBPyConnection, path=None) -> int:
+    """Apply the committed manual corrections. Returns entries applied."""
+    target = Path(path) if path is not None else OVERRIDES_PATH
+    if not target.is_file():
+        return 0
+
+    data = yaml.safe_load(target.read_text(encoding="utf-8")) or {}
+    applied = 0
+
+    for source, entries in data.items():
+        for source_player_id, fpl_code in (entries or {}).items():
+            key = str(source_player_id)
+            con.execute(
+                "DELETE FROM map_player_source WHERE source = ? AND source_player_id = ?",
+                [source, key])
+            con.execute(
+                "DELETE FROM unresolved_player WHERE source = ? AND source_player_id = ?",
+                [source, key])
+
+            if fpl_code is None:
+                applied += 1
+                continue
+
+            row = con.execute(
+                "SELECT player_id FROM dim_player WHERE fpl_code = ?", [fpl_code]
+            ).fetchone()
+            if row is None:
+                log.warning(
+                    "override %s/%s references unknown fpl code %s", source, key, fpl_code)
+                continue
+
+            con.execute(
+                "INSERT INTO map_player_source (player_id, source, source_player_id, "
+                "method, confidence) VALUES (?, ?, ?, 'override', 1.0)",
+                [row[0], source, key])
+            applied += 1
+    return applied
+
+
+def resolve_players(con: duckdb.DuckDBPyConnection) -> int:
+    """Rebuild player identity from the src_ tables. Returns spine matches.
+
+    Every player table is wiped first and the sequence restarted, so two runs
+    produce identical tables down to the player_ids. That is what makes the map
+    re-derivable rather than an artefact that has to survive rebuilds.
+
+    This runs once after every source has loaded, never per-source: matching is
+    inherently cross-source, and the FPL spine must exist before anything can be
+    matched into it.
+    """
+    con.execute("DELETE FROM map_player_source")
+    con.execute("DELETE FROM unresolved_player")
+    con.execute("DELETE FROM dim_player")
+    con.execute("CREATE OR REPLACE SEQUENCE seq_player_id START 1")
+
+    build_fpl_spine(con)
+    matched = resolve_understat_players(con)
+    matched += resolve_fotmob_players(con)
+    apply_overrides(con)
+    return matched

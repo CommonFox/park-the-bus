@@ -1,0 +1,15 @@
+# Manual corrections to derived player identity. Applied last, always wins.
+#
+# Keyed by source, then that source's own player id (quoted, always a string).
+# The value is the FPL `code` to bind to -- a stable, human-findable number --
+# rather than the surrogate player_id, which changes between rebuilds.
+#
+# A null value forces a NON-match: the source player is left unmapped. That is
+# the only way to undo a confidently wrong scored match without loosening the
+# threshold for every other player.
+#
+# understat:
+#   "647": 223094
+#   "1899": null
+# fotmob:
+#   "737066": 223094

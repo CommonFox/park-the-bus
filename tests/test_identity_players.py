@@ -307,3 +307,75 @@ def test_championship_players_are_resolved_separately(con):
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'fotmob'"
     ).fetchone()[0] == 1
+
+
+def test_resolve_players_runs_every_source(con):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+    _fotmob_team(con, 9825, "Arsenal")
+    _fotmob_player(con, 737066, "Bukayo Saka", 9825)
+
+    players.resolve_players(con)
+
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
+    sources = {r[0] for r in con.execute(
+        "SELECT DISTINCT source FROM map_player_source").fetchall()}
+    assert sources == {"fpl", "understat", "fotmob"}
+
+
+def test_resolve_players_is_idempotent(con):
+    """Two rebuilds must produce byte-identical tables, including player_ids --
+    that is what makes the warehouse disposable."""
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+
+    players.resolve_players(con)
+    first = con.execute(
+        "SELECT * FROM dim_player ORDER BY player_id").fetchall()
+    first_map = con.execute(
+        "SELECT * FROM map_player_source ORDER BY source, source_player_id").fetchall()
+
+    players.resolve_players(con)
+    assert con.execute(
+        "SELECT * FROM dim_player ORDER BY player_id").fetchall() == first
+    assert con.execute(
+        "SELECT * FROM map_player_source ORDER BY source, source_player_id"
+    ).fetchall() == first_map
+
+
+def test_an_override_forces_a_mapping(con, tmp_path):
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    overrides = tmp_path / "overrides.yaml"
+    overrides.write_text("understat:\n  '12345': 223094\n", encoding="utf-8")
+
+    assert players.apply_overrides(con, overrides) == 1
+    row = con.execute(
+        "SELECT method, confidence FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '12345'").fetchone()
+    assert row == ("override", 1.0)
+
+
+def test_an_override_can_force_a_non_match(con, tmp_path):
+    """A null override is the only way to undo a confidently wrong scored
+    match without loosening the threshold for everyone."""
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+    players.resolve_understat_players(con)
+
+    overrides = tmp_path / "overrides.yaml"
+    overrides.write_text("understat:\n  '647': null\n", encoding="utf-8")
+    players.apply_overrides(con, overrides)
+
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
+    ).fetchone()[0] == 0
