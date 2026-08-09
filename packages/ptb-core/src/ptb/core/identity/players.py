@@ -142,21 +142,38 @@ def build_fpl_spine(con: duckdb.DuckDBPyConnection) -> int:
 
     Idempotent: a code already mapped in map_player_source is skipped, the
     same check-before-create shape as resolve_match. Rerunning against
-    unchanged src_fpl_element data therefore creates nothing and returns 0.
+    unchanged source data therefore creates nothing and returns 0.
 
     birth_date and opta_code are taken as the latest non-null across seasons
     rather than the latest season's value: FPL only began publishing them
     recently, so the most recent season is not reliably the populated one.
+
+    src_fpl_element only ever holds the live bootstrap's current season, so a
+    player who left the league before that season never appears there. Their
+    codes still need spine rows -- src_fpl_element_season (vaastav) is unioned
+    in to cover every season it backfills. It carries no birth_date/opta_code,
+    so those columns contribute NULL for a code seen only there, which max()
+    ignores.
     """
     rows = con.execute(
+        "WITH combined AS ("
+        "  SELECT code, season, "
+        "         trim(coalesce(first_name, '') || ' ' || coalesce(second_name, '')) AS name, "
+        "         birth_date, opta_code "
+        "  FROM src_fpl_element WHERE code IS NOT NULL "
+        "  UNION ALL "
+        "  SELECT code, season, "
+        "         trim(coalesce(first_name, '') || ' ' || coalesce(second_name, '')) AS name, "
+        "         CAST(NULL AS DATE) AS birth_date, CAST(NULL AS VARCHAR) AS opta_code "
+        "  FROM src_fpl_element_season WHERE code IS NOT NULL "
+        ") "
         "SELECT code, "
-        "       arg_max(trim(coalesce(first_name, '') || ' ' "
-        "                    || coalesce(second_name, '')), season) AS canonical_name, "
+        "       arg_max(name, season) AS canonical_name, "
         "       max(birth_date) AS birth_date, "
         "       max(opta_code)  AS opta_code, "
         "       min(season)     AS first_season, "
         "       max(season)     AS last_season "
-        "FROM src_fpl_element WHERE code IS NOT NULL "
+        "FROM combined "
         "GROUP BY code ORDER BY code"
     ).fetchall()
 
@@ -192,6 +209,13 @@ def _fpl_candidates(con: duckdb.DuckDBPyConnection, season: str) -> List[Candida
 
     Blocking by season keeps each comparison set at roughly 600 players, which
     makes the pairwise cost negligible and removes most homonym risk for free.
+
+    src_fpl_element only ever holds the live bootstrap's current season, so a
+    historical season -- anything vaastav backfilled -- has no rows there.
+    Falls back to src_fpl_element_season, which vaastav populates for every
+    season it covers. That table carries no team name (src_fpl_team is
+    likewise current-season-only), so historical candidates match on name and,
+    where the spine already carries it, birth_date alone.
     """
     rows = con.execute(
         "SELECT p.player_id, p.canonical_name, p.birth_date, p.opta_code, t.name "
@@ -201,6 +225,19 @@ def _fpl_candidates(con: duckdb.DuckDBPyConnection, season: str) -> List[Candida
         "JOIN src_fpl_element e "
         "  ON CAST(e.code AS VARCHAR) = m.source_player_id AND e.season = ? "
         "JOIN src_fpl_team t ON t.season = e.season AND t.team_id = e.team "
+        "ORDER BY p.player_id",
+        [season],
+    ).fetchall()
+    if rows:
+        return [Candidate(*row) for row in rows]
+
+    rows = con.execute(
+        "SELECT p.player_id, p.canonical_name, p.birth_date, p.opta_code, NULL "
+        "FROM dim_player p "
+        "JOIN map_player_source m "
+        "  ON m.player_id = p.player_id AND m.source = 'fpl' "
+        "JOIN src_fpl_element_season e "
+        "  ON CAST(e.code AS VARCHAR) = m.source_player_id AND e.season = ? "
         "ORDER BY p.player_id",
         [season],
     ).fetchall()

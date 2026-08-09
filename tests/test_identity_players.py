@@ -73,6 +73,26 @@ def test_spine_carries_birth_date_and_opta_code(con):
     assert row == (dt.date(2001, 9, 5), "p223094")
 
 
+def _fpl_element_season(con, season, element_id, code, first, second, team=None):
+    con.execute(
+        "INSERT OR REPLACE INTO src_fpl_element_season (season, element_id, code, "
+        "first_name, second_name, web_name, element_type, team, archive_key) "
+        "VALUES (?, ?, ?, ?, ?, ?, 3, ?, 'k')",
+        [season, element_id, code, first, second, second, team])
+
+
+def test_spine_includes_a_player_seen_only_in_vaastav_history(con):
+    """src_fpl_element only ever holds the live bootstrap's current season. A
+    player who left the league before that season -- so never appears there --
+    still needs a spine row, or every historical Understat/FotMob appearance of
+    theirs is forced into 'created' for lack of any candidate to match against.
+    """
+    _fpl_element_season(con, "2019/20", 7, 98765, "Wayne", "Rooney")
+    assert players.build_fpl_spine(con) == 1
+    row = con.execute("SELECT canonical_name, fpl_code FROM dim_player").fetchone()
+    assert row == ("Wayne Rooney", 98765)
+
+
 def test_build_fpl_spine_is_idempotent(con):
     _fpl_team(con, "2024/25", 1, "Arsenal")
     _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
@@ -227,6 +247,25 @@ def test_a_player_in_two_seasons_maps_once(con):
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
     ).fetchone()[0] == 1
+
+
+def test_a_historical_season_matches_via_vaastav_even_with_no_team_name(con):
+    """src_fpl_team is likewise current-season-only, so a historical candidate
+    carries no team name -- name (and birth_date, where the spine has it) is
+    all there is to match on for a season src_fpl_element never covered."""
+    _fpl_element_season(con, "2019/20", 7, 98765, "Wayne", "Rooney")
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "5001", "2019/20")
+    _understat_shot(con, "s1", "5001", "555", "Wayne Rooney", "Derby")
+
+    assert players.resolve_understat_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 98765").fetchone()[0]
+    row = con.execute(
+        "SELECT player_id, method FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '555'").fetchone()
+    assert row == (fpl_player_id, "scored")
 
 
 def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
