@@ -46,6 +46,16 @@ def test_unrelated_short_surnames_do_not_collide():
     assert similarity("Danny Ings", "Tyrone Mings") < 0.80
 
 
+def test_two_names_sharing_only_a_truncated_form_are_not_certain():
+    """Andre Gray and Archie Gray both reduce to the same truncated forms --
+    bare surname 'gray', initial+surname 'a gray' -- so an exact match on
+    that shared truncation is not evidence the two full names are the same
+    player. A shared variant only counts as certain when it equals one side's
+    own full name (the Gabriel Jesus / Jesus case), not when both sides are
+    independently truncating down to the same short string."""
+    assert similarity("Andre Gray", "Archie Gray") < 1.0
+
+
 def test_similarity_is_symmetric():
     a = similarity("Gabriel Fernando de Jesus", "Jesus")
     b = similarity("Jesus", "Gabriel Fernando de Jesus")

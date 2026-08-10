@@ -32,26 +32,29 @@ def name_variants(full_name: str) -> Set[str]:
 
 
 def similarity(left: str, right: str) -> float:
-    """1.0 if any variant matches exactly, else Jaro-Winkler over the full names.
+    """1.0 if a shared variant is one side's own full name, else Jaro-Winkler
+    over the full names.
 
-    The truncated variants (bare surname, initial + surname) are compared for
-    exact equality only, never fuzzily against each other. Jaro-Winkler is
-    generous with short strings -- 'Ings' vs 'Mings' scores 0.93 -- so fuzzily
-    comparing two bare surnames turns unrelated players with similar short
-    surnames into a near-tie against a true match, tripping the ambiguity
-    margin. Fuzziness is reserved for genuine variation in the full name (a
-    dropped diacritic name_variants doesn't already fold, a mononym like
-    'Joelinton' against a full legal name); the exact-variant check above
-    already covers the legitimate truncated-name cases (FPL's web_name being
-    just a surname, an initial-form byline).
+    A shared variant is only trustworthy when it equals one side's actual
+    full normalized name -- the Gabriel Jesus / Jesus case, where Understat's
+    full legal name and FPL's bare-surname web_name genuinely refer to the
+    same string once one side is truncated. It is not trustworthy when BOTH
+    sides are independently truncating down to the same short form: Andre
+    Gray and Archie Gray both reduce to 'gray' and 'a gray', which is a
+    coincidence of two different full names, not evidence they match. The
+    same reasoning rules out fuzzy comparison between two bare truncated
+    variants -- Jaro-Winkler is generous with short strings ('Ings' vs
+    'Mings' scores 0.93) -- so fuzziness is reserved for the full names.
     """
-    left_variants = name_variants(left)
-    right_variants = name_variants(right)
-    if not left_variants or not right_variants:
+    left_norm = normalize_name(left)
+    right_norm = normalize_name(right)
+    if not left_norm or not right_norm:
         return 0.0
-    if left_variants & right_variants:
+
+    common = name_variants(left) & name_variants(right)
+    if common and (left_norm in common or right_norm in common):
         return 1.0
-    return JaroWinkler.similarity(normalize_name(left), normalize_name(right))
+    return JaroWinkler.similarity(left_norm, right_norm)
 
 
 # Name carries most of the signal and is the only feature always available.
