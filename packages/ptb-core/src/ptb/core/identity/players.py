@@ -12,7 +12,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import List, NamedTuple, Optional, Sequence
+from typing import Dict, List, NamedTuple, Optional, Sequence
 
 import duckdb
 import yaml
@@ -269,8 +269,16 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
     a confident wrong match on a similar name -- outside E0 there is simply no
     candidate set, and the player becomes a new dim_player row.
 
-    Rows arrive ordered by season, so a player active across several seasons is
-    decided by their earliest appearance and skipped thereafter.
+    Rows arrive ordered by season, but every block a player appears in is
+    tried, not just the earliest. A player who transferred into England --
+    Ligue 1 in 2019/20, Arsenal from 2023/24 -- has no candidate pool at their
+    earliest (non-E0) appearance; deciding on that appearance alone would
+    permanently foreclose the real match their later English appearance makes
+    possible. An ambiguous result does not stop the search either -- only a
+    successful match does -- so a later, cleaner season can still resolve a
+    player whose first blocked appearance happened to collide with a homonym.
+    Only once every block has been tried and none produced a candidate at all
+    does a player fall through to created.
 
     Idempotent: a source player already present in map_player_source is
     skipped outright, the same check-before-create guard as resolve_match
@@ -280,15 +288,22 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
     returns 0.
     """
     candidate_cache = {}
-    seen = set()
-    matched = 0
+    by_player: Dict[str, List[tuple]] = {}
+    order: List[str] = []
+    names: Dict[str, str] = {}
 
     for source_player_id, name, competition, season, team_name in rows:
-        key = str(source_player_id)
-        if key in seen or not name:
+        if not name:
             continue
-        seen.add(key)
+        key = str(source_player_id)
+        if key not in by_player:
+            by_player[key] = []
+            order.append(key)
+            names[key] = name
+        by_player[key].append((competition, season, team_name))
 
+    matched = 0
+    for key in order:
         existing = con.execute(
             "SELECT player_id FROM map_player_source "
             "WHERE source = ? AND source_player_id = ?",
@@ -297,16 +312,26 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
         if existing is not None:
             continue
 
-        block = (competition, season)
-        if block not in candidate_cache:
-            candidate_cache[block] = (
-                _fpl_candidates(con, season) if competition == "E0" else []
-            )
+        name = names[key]
+        result = Match()
+        for competition, season, team_name in by_player[key]:
+            block = (competition, season)
+            if block not in candidate_cache:
+                candidate_cache[block] = (
+                    _fpl_candidates(con, season) if competition == "E0" else []
+                )
+            if not candidate_cache[block]:
+                continue
 
-        result = match_player(
-            candidate_cache[block],
-            name=name, team_name=team_name, birth_date=None, opta_code=None,
-        )
+            attempt = match_player(
+                candidate_cache[block],
+                name=name, team_name=team_name, birth_date=None, opta_code=None,
+            )
+            if attempt.player_id is not None:
+                result = attempt
+                break
+            if attempt.reason is not None and result.reason is None:
+                result = attempt
 
         if result.reason is not None:
             con.execute(
@@ -317,7 +342,9 @@ def _resolve_source_players(con, source: str, rows: Sequence[tuple]) -> int:
             continue
 
         if result.player_id is None:
-            player_id, method, confidence = _create_player(con, name, season), "created", 1.0
+            earliest_season = by_player[key][0][1]
+            player_id, method, confidence = (
+                _create_player(con, name, earliest_season), "created", 1.0)
         else:
             player_id = result.player_id
             method, confidence = result.method, result.confidence

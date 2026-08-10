@@ -268,6 +268,33 @@ def test_a_historical_season_matches_via_vaastav_even_with_no_team_name(con):
     assert row == (fpl_player_id, "scored")
 
 
+def test_a_player_who_transferred_into_england_still_matches(con):
+    """Understat history predates an English candidate existing at all for a
+    player who transferred in from another Big-5 league. Deciding on the
+    earliest appearance alone -- Ligue 1, with no candidate pool since
+    candidates only ever exist for E0 -- would permanently foreclose a real
+    match that only becomes possible once their Premier League appearance
+    (and FPL candidate) exists. Every block must be tried, not just the
+    first."""
+    _understat_match(con, "3001", "2019/20", competition="F1")
+    _understat_shot(con, "s1", "3001", "999", "Jean Test", "Marseille")
+
+    _fpl_team(con, "2023/24", 1, "Arsenal")
+    _fpl_element(con, "2023/24", 30, 555555, "Jean", "Test", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "3002", "2023/24", competition="E0")
+    _understat_shot(con, "s2", "3002", "999", "Jean Test", "Arsenal")
+
+    assert players.resolve_understat_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 555555").fetchone()[0]
+    row = con.execute(
+        "SELECT player_id, method FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '999'").fetchone()
+    assert row == (fpl_player_id, "name_team_season")
+
+
 def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
     """A player with no FPL candidate (non-E0) takes the 'created' branch.
 
