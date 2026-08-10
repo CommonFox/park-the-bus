@@ -32,16 +32,26 @@ def name_variants(full_name: str) -> Set[str]:
 
 
 def similarity(left: str, right: str) -> float:
-    """Best Jaro-Winkler score over the two names' variants, 0.0 to 1.0."""
+    """1.0 if any variant matches exactly, else Jaro-Winkler over the full names.
+
+    The truncated variants (bare surname, initial + surname) are compared for
+    exact equality only, never fuzzily against each other. Jaro-Winkler is
+    generous with short strings -- 'Ings' vs 'Mings' scores 0.93 -- so fuzzily
+    comparing two bare surnames turns unrelated players with similar short
+    surnames into a near-tie against a true match, tripping the ambiguity
+    margin. Fuzziness is reserved for genuine variation in the full name (a
+    dropped diacritic name_variants doesn't already fold, a mononym like
+    'Joelinton' against a full legal name); the exact-variant check above
+    already covers the legitimate truncated-name cases (FPL's web_name being
+    just a surname, an initial-form byline).
+    """
     left_variants = name_variants(left)
     right_variants = name_variants(right)
     if not left_variants or not right_variants:
         return 0.0
-    return max(
-        JaroWinkler.similarity(a, b)
-        for a in left_variants
-        for b in right_variants
-    )
+    if left_variants & right_variants:
+        return 1.0
+    return JaroWinkler.similarity(normalize_name(left), normalize_name(right))
 
 
 # Name carries most of the signal and is the only feature always available.

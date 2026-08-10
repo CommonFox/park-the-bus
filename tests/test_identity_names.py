@@ -37,6 +37,15 @@ def test_different_players_score_low():
     assert similarity("Bukayo Saka", "Erling Haaland") < 0.7
 
 
+def test_unrelated_short_surnames_do_not_collide():
+    """Jaro-Winkler is generous with short strings: comparing the bare-surname
+    variants alone scores 'Ings' vs 'Mings' at 0.933, close enough to a true
+    match's 1.0 to trip the ambiguity margin and flag an unrelated player as a
+    false collision. Fuzzy comparison must fall back to the full names, not
+    the truncated variants, once no variant matches exactly."""
+    assert similarity("Danny Ings", "Tyrone Mings") < 0.80
+
+
 def test_similarity_is_symmetric():
     a = similarity("Gabriel Fernando de Jesus", "Jesus")
     b = similarity("Jesus", "Gabriel Fernando de Jesus")
