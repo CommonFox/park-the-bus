@@ -2,6 +2,30 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status as of 2026-08-09:** Tasks 1–8 shipped via
+> [PR #7](https://github.com/CommonFox/park-the-bus/pull/7). Tasks 9, 10, 11
+> executed and committed this session (`514d5a7`, `439ca46`, `2ae320c`),
+> exactly as originally drafted — no edits needed. This is also **Phase 1**
+> of [`specs/2026-08-08-fpl-replatform-design.md`](../specs/2026-08-08-fpl-replatform-design.md).
+>
+> **Task 12 (validation) is in progress, not complete.** Running the matcher
+> against a real 10-season, five-league archive for the first time — rather
+> than the synthetic same-season fixtures every unit test uses — surfaced
+> three real bugs in the pre-existing `names.py`/`players.py` matching logic
+> (not introduced by Tasks 9–11): fuzzy false-collisions between short
+> surnames, foreign-league transfers never getting a second chance to match
+> once their earliest appearance had no candidates, and a truncated-name
+> coincidence being treated as certain. All three fixed and unit-tested
+> (`931225d`, `7b04f80`, `772fb95`), plus two bugs in this task's own
+> `compare_player_map.py` script (`8e241f4`). **Not done:** a final rebuild +
+> validation run with all three fixes applied together — each cycle takes
+> ~80 minutes against the real archive, and the last one only covered fixes
+> 1 and 2. Matched players climbed 0 → 1,191 → 1,625 → 2,865 across the
+> session's cycles; the coverage bars below (67%/77%) have not been
+> re-checked since fix 3. Run `uv run ptb rebuild` then
+> `uv run python scripts/compare_player_map.py data/ptb.duckdb
+> ../fpl-app/data/fpl.duckdb` to pick this up.
+
 **Goal:** Give the warehouse a `dim_player` dimension and a re-derivable cross-source player map, so a query can follow one footballer from the FPL API to Understat to FotMob, and across seasons.
 
 **Architecture:** A new `identity/players.py` beside the existing `teams.py`/`matches.py`. FPL's stable `code` builds the spine of `dim_player`; Understat and FotMob players are matched into it by three deterministic tiers, then a scored fallback with a threshold and a runner-up margin. Ambiguity records itself in `unresolved_player` instead of guessing. A committed `player_overrides.yaml` is applied last and always wins. The whole map is rebuilt from `src_` tables on every `ptb rebuild`.

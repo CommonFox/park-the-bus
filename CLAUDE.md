@@ -27,8 +27,8 @@ stay idempotent (re-running on an already-loaded archive key is a no-op via
 packages/ptb-core/src/ptb/core/
 ├── archive/       RawArchive + backend (local now, object storage later)
 ├── sources/        one module per provider + registry.py (name -> class lookup)
-├── identity/       team/match/player resolution (player resolution merged but not
-│                    wired into rebuild/coverage yet, see below)
+├── identity/       team/match/player resolution, wired into rebuild/coverage
+│                    (Task 12 validation in progress, see below)
 ├── warehouse/       schema.sql, db.py (connect + apply schema), load.py (replay),
 │                    loaders/ (one per source, registers into load.LOADERS)
 ├── config.py        all paths env-overridable (tests point at tmp dirs)
@@ -57,31 +57,57 @@ checkboxes are never checked off, even for fully merged work** — every plan
 in this repo currently shows 0 checked regardless of actual status. Don't
 trust them as a progress signal; check `git log`/branch state instead.
 
-## Known gaps as of 2026-08-08 (verify before relying on this — it will drift)
+## Known gaps as of 2026-08-09 (verify before relying on this — it will drift)
 
-- **Player identity is merged but inert.** `dim_player`,
-  `map_player_source`, `unresolved_player`, name/team/DOB matching, the
-  FPL-anchored spine (`build_fpl_spine`), and Understat resolution
-  (`resolve_understat_players`) are all on master, all tested (192 passing
-  total). But `warehouse/load.py`'s `rebuild()` never calls either
-  resolver, and `cli.py`'s `coverage` never reports `unresolved_player` —
-  so `ptb rebuild` today leaves `dim_player` permanently empty. Per
-  [`docs/superpowers/plans/2026-08-03-player-identity.md`](docs/superpowers/plans/2026-08-03-player-identity.md)
-  (landed via [PR #7](../../pull/7), merged as Tasks 1–8 without finishing
-  the plan): still missing are Task 9 (FotMob player resolution), Task 10
-  (`player_overrides.yaml` + a top-level resolver that calls both source
-  resolvers and applies overrides), Task 11 (wire that top-level resolver
-  into `rebuild`/`coverage` — this is the specific gap making the merged
-  code inert), and Task 12 (validation against `../fpl-app`'s existing
-  player map).
+- **Player identity: Tasks 9–11 done, Task 12 in progress.** `dim_player`,
+  `map_player_source`, `unresolved_player`, `resolve_fotmob_players`,
+  `player_overrides.yaml`, and the top-level `resolve_players` are all on
+  master and wired into `ptb rebuild`/`coverage` (`4b381fd`..`7b04f80`,
+  `772fb95`). A real local warehouse now exists (all sources ingested, full
+  10-season Understat backfill across the Big 5) and `dim_player` populates
+  correctly — this is no longer inert.
+
+  What's still open on Task 12 (validation against `../fpl-app`'s player
+  map, [`docs/superpowers/plans/2026-08-03-player-identity.md`](docs/superpowers/plans/2026-08-03-player-identity.md)):
+  running the matcher against real historical data for the first time (it
+  had only ever run against synthetic same-season test fixtures) surfaced
+  three real precision/recall bugs in the pre-existing `names.py`/`players.py`
+  matching logic, all found, fixed, and unit-tested this session:
+  1. Fuzzy comparison of truncated surname variants caused false collisions
+     between unrelated players with similar short surnames (`Ings` vs
+     `Mings` scored 0.933) — `931225d`.
+  2. `_resolve_source_players` decided a player's match using only their
+     earliest `(competition, season)` appearance; a player whose
+     Understat/FotMob history predates their move to England (candidates
+     only ever exist for competition `E0`) was permanently `created` even
+     once a real, matchable FPL candidate existed in a later season —
+     `7b04f80`.
+  3. A truncated-form collision between two *different* full names (`Andre
+     Gray` / `Archie Gray` both reduce to `"a gray"`) was being treated as
+     certain rather than coincidental — `772fb95`.
+
+  Each fix measurably increased matched players in real rebuilds (0 → 1,191
+  → 1,625 → 2,865 across the session), but **the final rebuild + validation
+  cycle after fix 3 was never run** (each cycle takes ~80 minutes against
+  the full archive) — `scripts/compare_player_map.py`'s coverage bars
+  (67%/77%) have not been re-checked against all three fixes together. That
+  re-run is the concrete next step before Task 12 can be marked done. Two
+  bugs in the validation script itself were also found and fixed along the
+  way (`ATTACH` needs a literal path, not a bound parameter; `USING SAMPLE`
+  applies before `WHERE`, not after) — see `8e241f4`.
 - **No gold layer.** No `v_*` views, no `(measure, source, priority)`
   precedence table. This is the actual next foundational piece — it's what
   the FPL/GAR ports are blocked on. [PR #6](../../pull/6)'s description
   names the concrete first view: `v_match_odds`, de-vigging
   `src_footballdata_odds` (settled) + `src_draftkings_odds` (forward) into
-  probabilities with source precedence.
-- **No local `data/`.** A fresh checkout has never had a full `ptb ingest`
-  run against it, so `ptb coverage` has nothing to show until that happens.
+  probabilities with source precedence. See also
+  [`docs/superpowers/specs/2026-08-08-fpl-replatform-design.md`](docs/superpowers/specs/2026-08-08-fpl-replatform-design.md),
+  which depends on this and on Task 12 landing first.
+- **Local `data/` now exists and is substantial.** Full ingest across all 7
+  sources, including a complete 10-season (2016/17–2025/26) Understat
+  backfill across the Big 5. `ptb rebuild` currently takes ~75-85 minutes
+  end to end against this archive (identity resolution included) — plan
+  accordingly before kicking one off interactively.
 - `ptb status` / `ptb verify` are specced, not implemented.
 - Branch/worktree hygiene is currently clean: no stale worktrees, no dead
   local branches. If a new one shows up while investigating something,
