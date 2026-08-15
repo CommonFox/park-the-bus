@@ -2,8 +2,8 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.archive import LocalBackend, RawArchive
-from ptb.core.sources import footballdata as fd
+from ptb.core import archive
+from ptb.core.silver import footballdata as fd
 
 
 def test_season_code_maps_start_year_to_four_digits():
@@ -50,11 +50,9 @@ def test_decode_falls_back_to_latin1_for_stray_bytes():
 
 
 def test_ingest_archives_one_envelope_per_competition_season(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(fd, "_fetch_csv", lambda url: "Div,Date\nE0,16/08/2024\n")
 
-    keys = fd.FootballDataSource().ingest(
-        archive,
+    keys = fd.ingest(
         competitions=["E0", "SP1"],
         seasons=[2024],
         captured_at=dt.datetime(2026, 8, 2, 10, 15, 0),
@@ -73,7 +71,6 @@ def test_ingest_archives_one_envelope_per_competition_season(tmp_path, monkeypat
 
 
 def test_ingest_skips_a_season_the_site_has_not_published(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
 
     def fake_fetch(url):
         if "2526" in url:
@@ -82,8 +79,8 @@ def test_ingest_skips_a_season_the_site_has_not_published(tmp_path, monkeypatch)
 
     monkeypatch.setattr(fd, "_fetch_csv", fake_fetch)
 
-    keys = fd.FootballDataSource().ingest(
-        archive, competitions=["E0"], seasons=[2024, 2025],
+    keys = fd.ingest(
+        competitions=["E0"], seasons=[2024, 2025],
         captured_at=dt.datetime(2026, 8, 2, 10, 15, 0),
     )
 
@@ -92,6 +89,5 @@ def test_ingest_skips_a_season_the_site_has_not_published(tmp_path, monkeypatch)
 
 
 def test_ingest_rejects_an_unknown_competition(tmp_path):
-    archive = RawArchive(LocalBackend(tmp_path))
     with pytest.raises(ValueError, match="ZZ9"):
-        fd.FootballDataSource().ingest(archive, competitions=["ZZ9"], seasons=[2024])
+        fd.ingest(competitions=["ZZ9"], seasons=[2024])

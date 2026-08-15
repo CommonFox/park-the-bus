@@ -2,13 +2,13 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.identity import matches
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import draftkings, fpl
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -24,7 +24,7 @@ def _dk(con, event_id, captured_at, home, away, kickoff):
 def test_resolve_draftkings_maps_events(con):
     _dk(con, "E1", dt.datetime(2026, 8, 3, 12, 0), "Arsenal", "Wolves",
         dt.datetime(2026, 8, 21, 19, 0))
-    assert matches.resolve_draftkings(con) == 1
+    assert draftkings.resolve_matches(con) == 1
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
 
 
@@ -34,7 +34,7 @@ def test_resolve_uses_latest_snapshot_only(con):
         dt.datetime(2026, 8, 21, 19, 0))
     _dk(con, "E1", dt.datetime(2026, 8, 3, 18, 0), "Arsenal", "Wolves",
         dt.datetime(2026, 8, 21, 19, 0))
-    matches.resolve_draftkings(con)
+    draftkings.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
     assert con.execute(
         "SELECT count(*) FROM map_match_source WHERE source = 'draftkings'"
@@ -50,11 +50,11 @@ def test_draftkings_and_fpl_resolve_to_one_match(con):
     con.execute(
         "INSERT INTO src_fpl_fixture (season, fixture_id, event, kickoff_time, team_h, "
         "team_a, archive_key) VALUES ('2026/27', 1, 1, TIMESTAMP '2026-08-21 19:00:00', 1, 20, 'k')")
-    matches.resolve_fpl(con)
+    fpl.resolve_matches(con)
 
     _dk(con, "E1", dt.datetime(2026, 8, 3, 12, 0), "Arsenal", "Wolves",
         dt.datetime(2026, 8, 21, 19, 0))
-    matches.resolve_draftkings(con)
+    draftkings.resolve_matches(con)
 
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
     assert con.execute("SELECT count(DISTINCT source) FROM map_match_source").fetchone()[0] == 2
@@ -63,6 +63,6 @@ def test_draftkings_and_fpl_resolve_to_one_match(con):
 def test_resolve_draftkings_is_idempotent(con):
     _dk(con, "E1", dt.datetime(2026, 8, 3, 12, 0), "Arsenal", "Wolves",
         dt.datetime(2026, 8, 21, 19, 0))
-    matches.resolve_draftkings(con)
-    matches.resolve_draftkings(con)
+    draftkings.resolve_matches(con)
+    draftkings.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1

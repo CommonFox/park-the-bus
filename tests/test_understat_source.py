@@ -2,8 +2,8 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.archive import LocalBackend, RawArchive
-from ptb.core.sources import understat as us
+from ptb.core import archive
+from ptb.core.silver import understat as us
 
 
 def test_season_label_and_parse_roundtrip():
@@ -39,12 +39,11 @@ def _league_payload():
 
 
 def test_ingest_archives_league_then_played_matches(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(us, "_fetch_league", lambda s, lg, yr: _league_payload())
     monkeypatch.setattr(us, "_fetch_match", lambda s, mid: {"shots": {"h": [], "a": []}})
 
-    keys = us.UnderstatSource().ingest(
-        archive, leagues=["EPL"], seasons=[2024],
+    keys = us.ingest(
+        leagues=["EPL"], seasons=[2024],
         captured_at=dt.datetime(2026, 8, 3, 12, 0, 0),
     )
 
@@ -61,37 +60,34 @@ def test_ingest_archives_league_then_played_matches(tmp_path, monkeypatch):
 
 
 def test_ingest_is_incremental_by_default(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(us, "_fetch_league", lambda s, lg, yr: _league_payload())
 
     calls = []
     monkeypatch.setattr(us, "_fetch_match",
                         lambda s, mid: calls.append(mid) or {"shots": {"h": [], "a": []}})
 
-    us.UnderstatSource().ingest(archive, leagues=["EPL"], seasons=[2024],
-                                captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
-    us.UnderstatSource().ingest(archive, leagues=["EPL"], seasons=[2024],
-                                captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
+    us.ingest(leagues=["EPL"], seasons=[2024],
+              captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    us.ingest(leagues=["EPL"], seasons=[2024],
+              captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
 
     assert calls == ["1001"]  # second run skipped the already-archived match
 
 
 def test_refetch_forces_match_refetch(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(us, "_fetch_league", lambda s, lg, yr: _league_payload())
     calls = []
     monkeypatch.setattr(us, "_fetch_match",
                         lambda s, mid: calls.append(mid) or {"shots": {"h": [], "a": []}})
 
-    us.UnderstatSource().ingest(archive, leagues=["EPL"], seasons=[2024],
-                                captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
-    us.UnderstatSource().ingest(archive, leagues=["EPL"], seasons=[2024], refetch=True,
-                                captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
+    us.ingest(leagues=["EPL"], seasons=[2024],
+              captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    us.ingest(leagues=["EPL"], seasons=[2024], refetch=True,
+              captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
 
     assert calls == ["1001", "1001"]
 
 
 def test_ingest_rejects_unknown_league(tmp_path):
-    archive = RawArchive(LocalBackend(tmp_path))
     with pytest.raises(ValueError, match="Bundesliga2"):
-        us.UnderstatSource().ingest(archive, leagues=["Bundesliga2"], seasons=[2024])
+        us.ingest(leagues=["Bundesliga2"], seasons=[2024])

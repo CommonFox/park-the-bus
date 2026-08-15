@@ -3,27 +3,27 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import fotmob as loader
+from ptb.core import warehouse
+from ptb.core.silver import fotmob as loader
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def _load(con, name):
     payload = json.loads((FIX / name).read_text(encoding="utf-8"))
-    return loader.load_fotmob(con, payload, "fotmob/" + name)
+    return loader.load(con, payload, "fotmob/" + name)
 
 
 def test_fotmob_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "fotmob" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "fotmob" in SOURCES
 
 
 def test_player_stat_loads_each_row(con):
@@ -77,4 +77,4 @@ def test_empty_statsdata_writes_nothing(con):
         "stat": "goals", "stat_type": "players",
         "data": {"leagueDetails": {"name": "Premier League"}, "statsList": [], "statsData": []},
     }
-    assert loader.load_fotmob(con, payload, "k") == 0
+    assert loader.load(con, payload, "k") == 0

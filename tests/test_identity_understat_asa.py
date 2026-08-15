@@ -2,13 +2,13 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.identity import matches
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import asa, footballdata, matches, understat
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -25,7 +25,7 @@ def _insert_understat(con, mid, comp, season, kickoff, home, away):
 def test_resolve_understat_maps_loaded_matches(con):
     _insert_understat(con, "1001", "E0", "2024/25",
                       dt.datetime(2024, 8, 17, 15, 0), "Arsenal", "Wolverhampton Wanderers")
-    resolved = matches.resolve_understat(con)
+    resolved = understat.resolve_matches(con)
     assert resolved == 1
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
 
@@ -38,11 +38,11 @@ def test_understat_and_footballdata_resolve_to_one_match(con):
         "(competition, season, match_date, kickoff_time, home_team, away_team, archive_key) "
         "VALUES ('E0', '2024/25', DATE '2024-08-17', TIME '15:00', 'Arsenal', 'Wolves', 'fd')"
     )
-    matches.resolve_footballdata(con)
+    footballdata.resolve_matches(con)
 
     _insert_understat(con, "1001", "E0", "2024/25",
                       dt.datetime(2024, 8, 17, 15, 0), "Arsenal", "Wolverhampton Wanderers")
-    matches.resolve_understat(con)
+    understat.resolve_matches(con)
 
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
     sources = con.execute(
@@ -54,8 +54,8 @@ def test_understat_and_footballdata_resolve_to_one_match(con):
 def test_resolve_understat_is_idempotent(con):
     _insert_understat(con, "1001", "E0", "2024/25",
                       dt.datetime(2024, 8, 17, 15, 0), "Arsenal", "Wolverhampton Wanderers")
-    matches.resolve_understat(con)
-    matches.resolve_understat(con)
+    understat.resolve_matches(con)
+    understat.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
 
 
@@ -78,7 +78,7 @@ def test_resolve_asa_maps_games_via_team_names(con):
     _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
     _insert_asa_game(con, "G1", "nwsl", "2024",
                      dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
-    resolved = matches.resolve_asa(con)
+    resolved = asa.resolve_matches(con)
     assert resolved == 1
     row = con.execute(
         "SELECT m.competition, t.canonical_name FROM dim_match m "
@@ -94,7 +94,7 @@ def test_asa_late_kickoff_resolves_within_window(con):
     _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
     _insert_asa_game(con, "G_UTC", "nwsl", "2024",
                      dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
-    matches.resolve_asa(con)
+    asa.resolve_matches(con)
 
     other = matches.resolve_match(
         con, source="fotmob", source_match_id="fm-1", competition="NWSL",
@@ -110,6 +110,6 @@ def test_resolve_asa_is_idempotent(con):
     _insert_asa_team(con, "nwsl", "T_SEA", "Seattle Reign FC")
     _insert_asa_game(con, "G1", "nwsl", "2024",
                      dt.datetime(2024, 6, 15, 2, 30), "T_POR", "T_SEA")
-    matches.resolve_asa(con)
-    matches.resolve_asa(con)
+    asa.resolve_matches(con)
+    asa.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1

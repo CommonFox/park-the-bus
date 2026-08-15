@@ -24,36 +24,61 @@ v_*                                                        gold    conformed vie
 gzipped JSON payload, keyed by `{source}/{endpoint}/{label}__{timestamp}`,
 and payloads are never mutated. This is the actual source of truth, not the
 warehouse — a parser bug is a re-parse, not a re-fetch. Gitignored; lives
-only on disk (`RawArchive` in
-[`archive/archive.py`](packages/ptb-core/src/ptb/core/archive/archive.py),
-swappable to object storage later via `ArchiveBackend`).
+only on disk. [`archive.py`](packages/ptb-core/src/ptb/core/archive.py) is
+addressed purely by string key — only its private `_path` knows a key maps
+to a file, so object storage can drop in later.
 
 **Silver — `src_*` tables.** One table per source per entity
 (`src_footballdata_match`, `src_fpl_player_gw`, `src_asa_player_xgoals`, …),
 typed but otherwise source-faithful. Nothing is reconciled here: if two
 sources disagree, both rows survive. On top of this sits identity
-resolution — `dim_team`, `dim_match`, and `map_*_source` bridge tables that
-give each real-world team/match one surrogate id across sources. See
-[`warehouse/schema.sql`](packages/ptb-core/src/ptb/core/warehouse/schema.sql)
-for every table and
-[`identity/`](packages/ptb-core/src/ptb/core/identity/) for how resolution
-works (team aliases + diacritic folding; matches resolved on a ±36h kickoff
-window, not exact date equality, so a late-Pacific-kickoff NWSL game and a
-UTC-reporting source still land on the same match).
+resolution — `dim_team`, `dim_match`, `dim_player` and `map_*_source` bridge
+tables that give each real-world team/match/player one surrogate id across
+sources (team aliases + diacritic folding; matches resolved on a ±36h
+kickoff window, not exact date equality, so a late-Pacific-kickoff NWSL game
+and a UTC-reporting source still land on the same match; players matched
+into an FPL-anchored spine).
 
-**Gold — conformed views.** Not built yet. The plan is `v_*` views plus a
-`(measure, source, priority)` precedence table, so e.g. "xg" resolves
-Understat → FotMob without that choice being hardcoded in a loader. This is
-the layer downstream projects (FPL, GAR, WAR) are meant to query. The
-concrete first view identified so far is `v_match_odds` — de-vigging
-football-data's settled odds (`src_footballdata_odds`) and DraftKings'
-forward odds into probabilities with source precedence, which is what an
-FPL fixture-difficulty solver would read.
+**Gold — conformed views.** Not built yet;
+[`gold/`](packages/ptb-core/src/ptb/core/gold/) is scaffolded and empty. The
+plan is `v_*` views plus a `(measure, source, priority)` precedence table, so
+e.g. "xg" resolves Understat → FotMob without that choice being hardcoded in
+a loader. This is the layer downstream projects (FPL, GAR, WAR) are meant to
+query. The concrete first view identified so far is `v_match_odds` —
+de-vigging football-data's settled odds (`src_footballdata_odds`) and
+DraftKings' forward odds into probabilities with source precedence, which is
+what an FPL fixture-difficulty solver would read.
 
 The rule that makes the whole thing rebuildable from nothing: **`ptb
 ingest` only ever writes to the archive; `ptb rebuild` only ever reads from
 it.** Nothing does both. Delete `data/` entirely and `ptb ingest all && ptb
 rebuild` reproduces it.
+
+### Layout
+
+`ptb-core` is plain functions and modules — no classes outside a couple of
+`NamedTuple` records and the exception types. Each source owns its whole
+pipeline in one module plus one schema file, so adding a source means adding
+files in `silver/` and one line to `SOURCES`:
+
+```
+packages/ptb-core/src/ptb/core/
+├── archive.py       bronze: write/read/keys, addressed by string key
+├── warehouse.py     connect, apply schema, replay the archive
+├── config.py        all paths env-overridable
+├── cli.py           the `ptb` command
+├── silver/
+│   ├── __init__.py      SOURCES: name -> module
+│   ├── <source>.py      ingest() + load() + resolve_matches()/resolve_players()
+│   ├── <source>.sql     that source's tables
+│   ├── names.py         normalization + fuzzy comparison
+│   ├── teams.py  matches.py  players.py    conformed dimensions (+ .sql, .yaml)
+│   └── coerce.py        defensive numeric parsing shared by every loader
+└── gold/            conformed views (empty)
+```
+
+`warehouse.apply_schema` globs `silver/*.sql` in sorted order — no file
+references another's tables, so a new source needs no registration there.
 
 Full design rationale: [`docs/superpowers/specs/2026-08-02-universal-soccer-data-layer-design.md`](docs/superpowers/specs/2026-08-02-universal-soccer-data-layer-design.md).
 
@@ -99,21 +124,19 @@ men's football only. StatsBomb is specced but not yet built.
 What's real on `master` right now:
 
 - Archive, warehouse schema, CLI, and all 7 sources above — ingest and
-  loaders both, 192 passing tests.
+  loaders both, 243 passing tests.
 - Team and match identity resolution (`dim_team`, `dim_match`) across all
   sources that report matches.
-- **Player identity, partially wired.** `dim_player`, `map_player_source`,
-  `unresolved_player` exist, plus the FPL-anchored spine
-  (`build_fpl_spine`) and Understat resolution
-  (`resolve_understat_players`) — both merged and tested. But **neither is
-  called anywhere yet**: `ptb rebuild` never invokes them and `ptb
-  coverage` doesn't report `unresolved_player`, so running the CLI today
-  leaves `dim_player` empty. FotMob player resolution and a
-  `player_overrides.yaml` also don't exist yet. See
-  [PR #7](../../pull/7) for what landed vs. the original plan.
-- **No `data/` locally in a fresh checkout** — nobody has run a full
-  ingest against this exact codebase yet, so `ptb coverage` currently has
-  nothing to report until that happens.
+- **Player identity, wired into `ptb rebuild` and `ptb coverage`.**
+  `dim_player`, `map_player_source` and `unresolved_player` are populated
+  on every rebuild: an FPL-code-anchored spine, Understat and FotMob
+  matched into it, plus committed manual corrections in
+  `silver/player_overrides.yaml`. Validation against `../fpl-app`'s
+  existing player map is the open piece — see CLAUDE.md for exactly what's
+  left.
+- **A real local `data/`** — full ingest across all 7 sources, including a
+  10-season Understat backfill across the Big 5. A full `ptb rebuild`
+  against it takes ~75–85 minutes, identity resolution included.
 
 What hasn't started:
 

@@ -1,7 +1,7 @@
 """The `ptb` command.
 
-Subcommands are added by later tasks. The split that matters: `ingest` writes
-only to the archive, `rebuild` reads only from it. Nothing does both.
+The split that matters: `ingest` writes only to the archive, `rebuild` reads
+only from it. Nothing does both.
 """
 from __future__ import annotations
 
@@ -60,12 +60,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 def _cmd_ingest(args) -> int:
-    from .archive import RawArchive
-    from .sources import get_source, list_sources
-    from .sources.footballdata import parse_season
+    from .silver import source, source_names
+    from .silver.footballdata import parse_season
 
-    names = list_sources() if args.source == "all" else [args.source]
-    archive = RawArchive()
+    names = source_names() if args.source == "all" else [args.source]
 
     options = {}
     if args.competition:
@@ -77,7 +75,7 @@ def _cmd_ingest(args) -> int:
 
     total = 0
     for name in names:
-        keys = get_source(name).ingest(archive, **options)
+        keys = source(name).ingest(**options)
         print("{}: archived {} payload(s)".format(name, len(keys)))
         total += len(keys)
 
@@ -85,13 +83,12 @@ def _cmd_ingest(args) -> int:
 
 
 def _cmd_rebuild(args) -> int:
-    from .archive import RawArchive
-    from .warehouse import db, load
+    from . import warehouse
 
     sources = [s.strip() for s in args.source.split(",")] if args.source else None
-    con = db.connect()
+    con = warehouse.connect()
     try:
-        written = load.rebuild(con, RawArchive(), sources=sources)
+        written = warehouse.rebuild(con, sources=sources)
     finally:
         con.close()
 
@@ -104,8 +101,7 @@ def _cmd_rebuild(args) -> int:
 
 
 def _cmd_coverage(args) -> int:
-    from . import config
-    from .warehouse import db
+    from . import config, warehouse
 
     # A read-only connect fails outright if the file is absent, so check first
     # rather than letting duckdb raise at the user.
@@ -113,7 +109,7 @@ def _cmd_coverage(args) -> int:
         print("no warehouse yet -- run `ptb ingest` then `ptb rebuild`")
         return 1
 
-    con = db.connect(read_only=True)
+    con = warehouse.connect(read_only=True)
     try:
         rows = con.execute(
             "SELECT 'footballdata' AS source, competition, season, count(*) AS matches "

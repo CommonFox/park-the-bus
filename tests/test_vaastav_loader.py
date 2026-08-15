@@ -3,27 +3,27 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import vaastav as loader
+from ptb.core import warehouse
+from ptb.core.silver import vaastav as loader
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def _load(con):
     payload = json.loads((FIX / "vaastav_2024_25_sample.json").read_text(encoding="utf-8"))
-    return loader.load_vaastav(con, payload, "vaastav/season/2024-25__k.json.gz")
+    return loader.load(con, payload, "vaastav/season/2024-25__k.json.gz")
 
 
 def test_vaastav_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "vaastav" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "vaastav" in SOURCES
 
 
 def test_loads_player_season_and_gw(con):

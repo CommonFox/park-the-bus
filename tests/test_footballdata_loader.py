@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import footballdata as loader
+from ptb.core import warehouse
+from ptb.core.silver import footballdata as loader
 
 FIXTURE = Path(__file__).parent / "fixtures" / "footballdata_e0_2024_sample.json"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -34,14 +34,14 @@ def test_parse_date_returns_none_for_junk():
 
 
 def test_load_writes_every_row(con, payload):
-    rows = loader.load_footballdata(con, payload, "some/key.json.gz")
+    rows = loader.load(con, payload, "some/key.json.gz")
     assert rows == 5
     count = con.execute("SELECT count(*) FROM src_footballdata_match").fetchone()[0]
     assert count == 5
 
 
 def test_load_maps_columns_correctly(con, payload):
-    loader.load_footballdata(con, payload, "some/key.json.gz")
+    loader.load(con, payload, "some/key.json.gz")
     row = con.execute(
         "SELECT season, kickoff_time, home_goals, away_goals, result, "
         "       home_shots, away_shots, home_corners, referee "
@@ -57,12 +57,12 @@ def test_load_maps_columns_correctly(con, payload):
 
 
 def test_loading_twice_changes_nothing(con, payload):
-    loader.load_footballdata(con, payload, "some/key.json.gz")
+    loader.load(con, payload, "some/key.json.gz")
     first = con.execute(
         "SELECT * FROM src_footballdata_match ORDER BY match_date, home_team"
     ).fetchall()
 
-    loader.load_footballdata(con, payload, "some/key.json.gz")
+    loader.load(con, payload, "some/key.json.gz")
     second = con.execute(
         "SELECT * FROM src_footballdata_match ORDER BY match_date, home_team"
     ).fetchall()
@@ -85,7 +85,7 @@ def test_load_tolerates_a_1993_file_with_no_match_stats(con):
             "E0,14/08/93,Liverpool,Sheffield Weds,2,0,H,,,,\n"
         ),
     }
-    rows = loader.load_footballdata(con, payload, "old/key.json.gz")
+    rows = loader.load(con, payload, "old/key.json.gz")
     assert rows == 2
 
     row = con.execute(
@@ -106,31 +106,30 @@ def test_load_skips_blank_trailing_rows(con):
             "\n"
         ),
     }
-    assert loader.load_footballdata(con, payload, "k") == 1
+    assert loader.load(con, payload, "k") == 1
 
 
 def test_loader_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "footballdata" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "footballdata" in SOURCES
 
 
 def test_rebuild_is_deterministic(con, tmp_path, payload):
     """The property the whole design rests on: replaying the archive twice
     into a fresh warehouse gives byte-identical contents."""
-    from ptb.core.archive import LocalBackend, RawArchive
-    from ptb.core.warehouse import load
+    from ptb.core import archive
+    from ptb.core import warehouse
 
-    archive = RawArchive(LocalBackend(tmp_path / "raw"))
     archive.write("footballdata", "season", payload, label="E0__2024-25",
                   captured_at=dt.datetime(2026, 8, 2, 10, 15, 0))
 
-    load.rebuild(con, archive)
+    warehouse.rebuild(con)
     first = con.execute(
         "SELECT * FROM src_footballdata_match ORDER BY match_date, home_team"
     ).fetchall()
 
-    second_con = db.connect(tmp_path / "second.duckdb")
-    load.rebuild(second_con, archive)
+    second_con = warehouse.connect(tmp_path / "second.duckdb")
+    warehouse.rebuild(second_con)
     second = second_con.execute(
         "SELECT * FROM src_footballdata_match ORDER BY match_date, home_team"
     ).fetchall()

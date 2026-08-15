@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import footballdata as loader
+from ptb.core import warehouse
+from ptb.core.silver import footballdata as loader
 
 FIXTURE = Path(__file__).parent / "fixtures" / "footballdata_e0_odds_sample.json"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -23,7 +23,7 @@ def payload():
 
 
 def test_priced_match_gets_an_odds_row(con, payload):
-    loader.load_footballdata(con, payload, "k")
+    loader.load(con, payload, "k")
     # two matches loaded, but only the priced one gets an odds row
     assert con.execute("SELECT count(*) FROM src_footballdata_match").fetchone()[0] == 2
     assert con.execute("SELECT count(*) FROM src_footballdata_odds").fetchone()[0] == 1
@@ -33,7 +33,7 @@ def test_priced_match_gets_an_odds_row(con, payload):
 
 
 def test_odds_columns_map(con, payload):
-    loader.load_footballdata(con, payload, "k")
+    loader.load(con, payload, "k")
     row = con.execute(
         "SELECT competition, season, match_date, b365_h, ps_h, max_h, avg_h, "
         "       b365c_h, psc_h, avgc_h, over25_b365, under25_b365, over25_avg, "
@@ -61,7 +61,7 @@ def test_odds_columns_map(con, payload):
 
 
 def test_odds_no_longer_on_the_match_table(con, payload):
-    loader.load_footballdata(con, payload, "k")
+    loader.load(con, payload, "k")
     columns = {row[1] for row in con.execute("PRAGMA table_info('src_footballdata_match')").fetchall()}
     assert "odds_home" not in columns
     assert "odds_draw" not in columns
@@ -75,13 +75,13 @@ def test_oddsless_era_writes_no_odds_row(con):
         "csv": "Div,Date,HomeTeam,AwayTeam,FTHG,FTAG,FTR\n"
                "E0,14/08/93,Arsenal,Coventry,0,3,A\n",
     }
-    rows = loader.load_footballdata(con, payload, "k")
+    rows = loader.load(con, payload, "k")
     assert rows == 1
     assert con.execute("SELECT count(*) FROM src_footballdata_match").fetchone()[0] == 1
     assert con.execute("SELECT count(*) FROM src_footballdata_odds").fetchone()[0] == 0
 
 
 def test_odds_loader_is_idempotent(con, payload):
-    loader.load_footballdata(con, payload, "k")
-    loader.load_footballdata(con, payload, "k")
+    loader.load(con, payload, "k")
+    loader.load(con, payload, "k")
     assert con.execute("SELECT count(*) FROM src_footballdata_odds").fetchone()[0] == 1

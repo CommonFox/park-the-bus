@@ -4,22 +4,22 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import draftkings as loader
+from ptb.core import warehouse
+from ptb.core.silver import draftkings as loader
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def _load(con):
     payload = json.loads((FIX / "draftkings_markets_sample.json").read_text(encoding="utf-8"))
-    return loader.load_draftkings(con, payload, "draftkings/markets/k.json.gz")
+    return loader.load(con, payload, "draftkings/markets/k.json.gz")
 
 
 def test_season_from_kickoff():
@@ -28,8 +28,8 @@ def test_season_from_kickoff():
 
 
 def test_draftkings_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "draftkings" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "draftkings" in SOURCES
 
 
 def test_loads_only_fully_priced_events(con):
