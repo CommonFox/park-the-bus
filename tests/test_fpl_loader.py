@@ -4,27 +4,27 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import fpl as loader
+from ptb.core import warehouse
+from ptb.core.silver import fpl as loader
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def _load(con, name):
     payload = json.loads((FIX / name).read_text(encoding="utf-8"))
-    return loader.load_fpl(con, payload, "fpl/" + name)
+    return loader.load(con, payload, "fpl/" + name)
 
 
 def test_fpl_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "fpl" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "fpl" in SOURCES
 
 
 def test_bootstrap_loads_teams_positions_events_elements(con):
@@ -137,7 +137,7 @@ def test_bootstrap_tolerates_missing_birth_date(con):
     for element in payload["data"]["elements"]:
         element.pop("birth_date", None)
         element.pop("opta_code", None)
-    loader.load_fpl(con, payload, "fpl/no-birth-date")
+    loader.load(con, payload, "fpl/no-birth-date")
     row = con.execute(
         "SELECT birth_date, opta_code FROM src_fpl_element "
         "WHERE season = '2024/25' AND element_id = 11"

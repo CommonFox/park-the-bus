@@ -1,35 +1,35 @@
 import pytest
 
-from ptb.core.identity import teams, text
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import names, teams
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def test_normalize_lowercases_and_collapses_space():
-    assert text.normalize_name("  Manchester   United  ") == "manchester united"
+    assert names.normalize_name("  Manchester   United  ") == "manchester united"
 
 
 def test_normalize_strips_diacritics():
-    assert text.normalize_name("Atlético Madrid") == "atletico madrid"
-    assert text.normalize_name("Beşiktaş") == "besiktas"
+    assert names.normalize_name("Atlético Madrid") == "atletico madrid"
+    assert names.normalize_name("Beşiktaş") == "besiktas"
 
 
 def test_normalize_strips_punctuation():
     """M'gladbach and Nott'm Forest both appear in football-data files."""
-    assert text.normalize_name("M'gladbach") == "mgladbach"
-    assert text.normalize_name("Nott'm Forest") == "nottm forest"
-    assert text.normalize_name("St. Pauli") == "st pauli"
+    assert names.normalize_name("M'gladbach") == "mgladbach"
+    assert names.normalize_name("Nott'm Forest") == "nottm forest"
+    assert names.normalize_name("St. Pauli") == "st pauli"
 
 
 def test_normalize_is_idempotent():
-    once = text.normalize_name("Atlético Madrid")
-    assert text.normalize_name(once) == once
+    once = names.normalize_name("Atlético Madrid")
+    assert names.normalize_name(once) == once
 
 
 def test_aliases_map_variants_to_one_canonical_name():
@@ -75,7 +75,7 @@ def test_distinct_clubs_get_distinct_ids(con):
 def test_normalize_folds_non_decomposing_letters():
     """NFKD leaves these letters alone -- they are distinct letters, not
     accented ones -- so they need an explicit translation."""
-    from ptb.core.identity.text import normalize_name
+    from ptb.core.silver.names import normalize_name
 
     assert normalize_name("Ødegaard") == normalize_name("Odegaard")
     assert normalize_name("Łukasz") == normalize_name("Lukasz")

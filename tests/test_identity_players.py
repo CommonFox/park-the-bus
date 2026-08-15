@@ -2,13 +2,13 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.identity import players
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import fotmob, players, understat
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -169,6 +169,13 @@ def _understat_shot(con, shot_id, match_id, player_id, player, team):
         [shot_id, match_id, player, player_id, team])
 
 
+def _understat_player(con, understat_player_id, name, team, season, competition="E0"):
+    con.execute(
+        "INSERT OR REPLACE INTO src_understat_player (understat_player_id, competition, "
+        "season, player_name, team_name, archive_key) VALUES (?, ?, ?, ?, ?, 'k')",
+        [understat_player_id, competition, season, name, team])
+
+
 def test_understat_player_matches_the_fpl_spine(con):
     _fpl_team(con, "2024/25", 1, "Arsenal")
     _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
@@ -177,7 +184,7 @@ def test_understat_player_matches_the_fpl_spine(con):
     _understat_match(con, "1001", "2024/25")
     _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
 
-    assert players.resolve_understat_players(con) == 1
+    assert understat.resolve_players(con) == 1
     row = con.execute(
         "SELECT player_id, method FROM map_player_source "
         "WHERE source = 'understat' AND source_player_id = '647'").fetchone()
@@ -196,7 +203,30 @@ def test_a_shortened_fpl_name_still_matches(con):
     _understat_match(con, "1001", "2024/25")
     _understat_shot(con, "s1", "1001", "700", "Gabriel Fernando de Jesus", "Arsenal")
 
-    assert players.resolve_understat_players(con) == 1
+    assert understat.resolve_players(con) == 1
+
+
+def test_a_reversed_fpl_name_still_matches(con):
+    """FPL's first_name/second_name are reversed relative to Understat for
+    some East Asian players, e.g. the real Wataru Endo: FPL's canonical name
+    is 'Endo Wataru', Understat's is 'Wataru Endo'. Without the swapped-order
+    variant this silently creates a duplicate dim_player instead of matching
+    the real spine row."""
+    _fpl_team(con, "2024/25", 1, "Liverpool")
+    _fpl_element(con, "2024/25", 15, 400400, "Endo", "Wataru", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "800", "Wataru Endo", "Liverpool")
+
+    assert understat.resolve_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 400400").fetchone()[0]
+    row = con.execute(
+        "SELECT player_id FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '800'").fetchone()
+    assert row[0] == fpl_player_id
+    assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
 
 
 def test_a_player_absent_from_fpl_gets_a_new_row(con):
@@ -205,7 +235,7 @@ def test_a_player_absent_from_fpl_gets_a_new_row(con):
     _understat_match(con, "2001", "2024/25", competition="SP1")
     _understat_shot(con, "s1", "2001", "900", "Robert Lewandowski", "Barcelona")
 
-    assert players.resolve_understat_players(con) == 0
+    assert understat.resolve_players(con) == 0
     row = con.execute(
         "SELECT p.canonical_name, m.method FROM dim_player p "
         "JOIN map_player_source m ON m.player_id = p.player_id "
@@ -222,7 +252,7 @@ def test_an_ambiguous_understat_player_is_recorded_not_guessed(con):
     _understat_match(con, "1001", "2024/25")
     _understat_shot(con, "s1", "1001", "800", "Danny Ward", "Arsenal")
 
-    assert players.resolve_understat_players(con) == 0
+    assert understat.resolve_players(con) == 0
     assert con.execute(
         "SELECT reason FROM unresolved_player WHERE source = 'understat'"
     ).fetchone()[0] == players.AMBIGUOUS
@@ -243,7 +273,7 @@ def test_a_player_in_two_seasons_maps_once(con):
     _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
     _understat_shot(con, "s2", "1002", "647", "Bukayo Saka", "Arsenal")
 
-    players.resolve_understat_players(con)
+    understat.resolve_players(con)
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
     ).fetchone()[0] == 1
@@ -259,7 +289,7 @@ def test_a_historical_season_matches_via_vaastav_even_with_no_team_name(con):
     _understat_match(con, "5001", "2019/20")
     _understat_shot(con, "s1", "5001", "555", "Wayne Rooney", "Derby")
 
-    assert players.resolve_understat_players(con) == 1
+    assert understat.resolve_players(con) == 1
     fpl_player_id = con.execute(
         "SELECT player_id FROM dim_player WHERE fpl_code = 98765").fetchone()[0]
     row = con.execute(
@@ -286,13 +316,58 @@ def test_a_player_who_transferred_into_england_still_matches(con):
     _understat_match(con, "3002", "2023/24", competition="E0")
     _understat_shot(con, "s2", "3002", "999", "Jean Test", "Arsenal")
 
-    assert players.resolve_understat_players(con) == 1
+    assert understat.resolve_players(con) == 1
     fpl_player_id = con.execute(
         "SELECT player_id FROM dim_player WHERE fpl_code = 555555").fetchone()[0]
     row = con.execute(
         "SELECT player_id, method FROM map_player_source "
         "WHERE source = 'understat' AND source_player_id = '999'").fetchone()
     assert row == (fpl_player_id, "name_team_season")
+
+
+def test_a_zero_shot_understat_player_still_matches_the_fpl_spine(con):
+    """src_understat_shot alone never surfaces a player with zero shots -- most
+    goalkeepers and many fringe subs. src_understat_player is Understat's own
+    league-season roster and must be enough on its own to bring such a player
+    into identity resolution."""
+    _fpl_team(con, "2024/25", 1, "Fulham")
+    _fpl_element(con, "2024/25", 40, 300300, "Bernd", "Leno", 1)
+    players.build_fpl_spine(con)
+
+    _understat_player(con, "181", "Bernd Leno", "Fulham", "2024/25")
+
+    assert understat.resolve_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 300300").fetchone()[0]
+    row = con.execute(
+        "SELECT player_id, method FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '181'").fetchone()
+    assert row == (fpl_player_id, "name_team_season")
+
+
+def test_shot_derived_team_wins_over_the_roster_row_for_the_same_block(con):
+    """A player can move club mid-season; the modal team across their shots is
+    the one that should decide the match, not the roster row's season-aggregate
+    club. If the roster team won instead, 'Some Other Club' vs FPL's 'Arsenal'
+    would sink the score below threshold and this player would go unmatched."""
+    _fpl_team(con, "2024/25", 1, "Arsenal")
+    _fpl_element(con, "2024/25", 11, 223094, "Bukayo", "Saka", 1)
+    players.build_fpl_spine(con)
+
+    _understat_match(con, "1001", "2024/25")
+    _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
+    _understat_player(con, "647", "Bukayo Saka", "Some Other Club", "2024/25")
+
+    assert understat.resolve_players(con) == 1
+    fpl_player_id = con.execute(
+        "SELECT player_id FROM dim_player WHERE fpl_code = 223094").fetchone()[0]
+    row = con.execute(
+        "SELECT player_id, method FROM map_player_source "
+        "WHERE source = 'understat' AND source_player_id = '647'").fetchone()
+    assert row == (fpl_player_id, "name_team_season")
+    assert con.execute(
+        "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
+    ).fetchone()[0] == 1
 
 
 def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
@@ -305,8 +380,8 @@ def test_resolve_understat_players_is_idempotent_for_a_created_player(con):
     _understat_match(con, "2001", "2024/25", competition="SP1")
     _understat_shot(con, "s1", "2001", "900", "Robert Lewandowski", "Barcelona")
 
-    assert players.resolve_understat_players(con) == 0
-    assert players.resolve_understat_players(con) == 0
+    assert understat.resolve_players(con) == 0
+    assert understat.resolve_players(con) == 0
     assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'understat'"
@@ -338,7 +413,7 @@ def test_fotmob_player_matches_the_fpl_spine(con):
     _fotmob_team(con, 9825, "Arsenal")
     _fotmob_player(con, 737066, "Bukayo Saka", 9825)
 
-    assert players.resolve_fotmob_players(con) == 1
+    assert fotmob.resolve_players(con) == 1
     fpl_player_id = con.execute(
         "SELECT player_id FROM dim_player WHERE fpl_code = 223094").fetchone()[0]
     assert con.execute(
@@ -357,7 +432,7 @@ def test_fotmob_player_appearing_in_many_stat_boards_maps_once(con):
     _fotmob_player(con, 737066, "Bukayo Saka", 9825, stat="goals")
     _fotmob_player(con, 737066, "Bukayo Saka", 9825, stat="assists")
 
-    assert players.resolve_fotmob_players(con) == 1
+    assert fotmob.resolve_players(con) == 1
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'fotmob'"
     ).fetchone()[0] == 1
@@ -369,7 +444,7 @@ def test_championship_players_are_resolved_separately(con):
     _fotmob_team(con, 8678, "Leeds", league_id=48)
     _fotmob_player(con, 999001, "Some Championship Player", 8678, league_id=48)
 
-    assert players.resolve_fotmob_players(con) == 0
+    assert fotmob.resolve_players(con) == 0
     assert con.execute(
         "SELECT count(*) FROM map_player_source WHERE source = 'fotmob'"
     ).fetchone()[0] == 1
@@ -436,7 +511,7 @@ def test_an_override_can_force_a_non_match(con, tmp_path):
     players.build_fpl_spine(con)
     _understat_match(con, "1001", "2024/25")
     _understat_shot(con, "s1", "1001", "647", "Bukayo Saka", "Arsenal")
-    players.resolve_understat_players(con)
+    understat.resolve_players(con)
 
     overrides = tmp_path / "overrides.yaml"
     overrides.write_text("understat:\n  '647': null\n", encoding="utf-8")
@@ -450,10 +525,9 @@ def test_an_override_can_force_a_non_match(con, tmp_path):
 def test_rebuild_resolves_players_after_every_source_loads(con, tmp_path):
     """Player matching is cross-source, so it cannot run inside the per-source
     branches the way match resolution does -- the spine must already exist."""
-    from ptb.core.archive import LocalBackend, RawArchive
-    from ptb.core.warehouse import load
+    from ptb.core import archive
+    from ptb.core import warehouse
 
-    archive = RawArchive(LocalBackend(tmp_path / "archive"))
     payload = {
         "source": "fpl", "endpoint": "bootstrap", "season": "2024/25",
         "data": {
@@ -466,5 +540,5 @@ def test_rebuild_resolves_players_after_every_source_loads(con, tmp_path):
     }
     archive.write("fpl", "bootstrap", payload)
 
-    load.rebuild(con, archive)
+    warehouse.rebuild(con)
     assert con.execute("SELECT count(*) FROM dim_player").fetchone()[0] == 1

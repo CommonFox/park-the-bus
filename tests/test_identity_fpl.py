@@ -2,13 +2,13 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.identity import matches
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import footballdata, fpl, understat
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -30,7 +30,7 @@ def test_resolve_fpl_maps_fixtures_via_team_names(con):
     _fpl_team(con, "2024/25", 1, "Arsenal")
     _fpl_team(con, "2024/25", 20, "Wolves")
     _fpl_fixture(con, "2024/25", 1, dt.datetime(2024, 8, 17, 14, 0), 1, 20)
-    resolved = matches.resolve_fpl(con)
+    resolved = fpl.resolve_matches(con)
     assert resolved == 1
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
 
@@ -43,7 +43,7 @@ def test_three_sources_resolve_to_one_match(con):
         "(competition, season, match_date, kickoff_time, home_team, away_team, archive_key) "
         "VALUES ('E0', '2024/25', DATE '2024-08-17', TIME '14:00', 'Arsenal', 'Wolves', 'fd')"
     )
-    matches.resolve_footballdata(con)
+    footballdata.resolve_matches(con)
 
     con.execute(
         "INSERT INTO src_understat_match "
@@ -51,12 +51,12 @@ def test_three_sources_resolve_to_one_match(con):
         "VALUES ('1001', 'E0', '2024/25', TIMESTAMP '2024-08-17 15:00:00', "
         "        'Arsenal', 'Wolverhampton Wanderers', 'us')"
     )
-    matches.resolve_understat(con)
+    understat.resolve_matches(con)
 
     _fpl_team(con, "2024/25", 1, "Arsenal")
     _fpl_team(con, "2024/25", 20, "Wolves")
     _fpl_fixture(con, "2024/25", 1, dt.datetime(2024, 8, 17, 14, 0), 1, 20)
-    matches.resolve_fpl(con)
+    fpl.resolve_matches(con)
 
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
     sources = con.execute("SELECT count(DISTINCT source) FROM map_match_source").fetchone()[0]
@@ -67,6 +67,6 @@ def test_resolve_fpl_is_idempotent(con):
     _fpl_team(con, "2024/25", 1, "Arsenal")
     _fpl_team(con, "2024/25", 20, "Wolves")
     _fpl_fixture(con, "2024/25", 1, dt.datetime(2024, 8, 17, 14, 0), 1, 20)
-    matches.resolve_fpl(con)
-    matches.resolve_fpl(con)
+    fpl.resolve_matches(con)
+    fpl.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1

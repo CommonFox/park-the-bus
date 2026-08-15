@@ -4,27 +4,27 @@ from pathlib import Path
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.warehouse.loaders import asa as loader
+from ptb.core import warehouse
+from ptb.core.silver import asa as loader
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
 
 def _load(con, name):
     payload = json.loads((FIX / name).read_text(encoding="utf-8"))
-    return loader.load_asa(con, payload, "asa/" + name)
+    return loader.load(con, payload, "asa/" + name)
 
 
 def test_asa_is_registered():
-    from ptb.core.warehouse.load import LOADERS
-    assert "asa" in LOADERS
+    from ptb.core.silver import SOURCES
+    assert "asa" in SOURCES
 
 
 def test_teams_loader(con):

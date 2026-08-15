@@ -1,6 +1,6 @@
 import pytest
 
-from ptb.core.identity.names import name_variants, similarity
+from ptb.core.silver.names import name_variants, similarity
 
 
 def test_variants_include_the_surname_alone():
@@ -17,6 +17,19 @@ def test_variants_of_a_single_word_name_is_just_itself():
     assert name_variants("Rodri") == {"rodri"}
 
 
+def test_variants_include_the_swapped_order_of_a_two_token_name():
+    """FPL's first_name/second_name split disagrees with the rest on which
+    token is the surname for some East Asian players -- FPL stores Wataru
+    Endo as 'Endo Wataru'. The swapped order must be a comparable variant."""
+    assert "wataru endo" in name_variants("Endo Wataru")
+
+
+def test_a_longer_name_has_no_full_reversal_variant():
+    """Swapping is only unambiguous for a two-token name -- a name with a
+    middle name or particle has no single well-defined 'swap'."""
+    assert "jesus de fernando gabriel" not in name_variants("Gabriel Fernando de Jesus")
+
+
 def test_variants_of_an_empty_name_is_empty():
     assert name_variants("   ") == set()
 
@@ -31,6 +44,14 @@ def test_initial_form_matches():
 
 def test_diacritics_do_not_block_a_match():
     assert similarity("Martin Ødegaard", "Martin Odegaard") == pytest.approx(1.0)
+
+
+def test_a_reversed_given_surname_order_still_matches():
+    """The real case this guards: FPL's canonical name for Wataru Endo is
+    'Endo Wataru' (its first_name/second_name are swapped), while Understat
+    writes 'Wataru Endo'. Raw Jaro-Winkler over the two full strings scores
+    this pair too low to clear the match threshold."""
+    assert similarity("Endo Wataru", "Wataru Endo") == pytest.approx(1.0)
 
 
 def test_different_players_score_low():
@@ -66,7 +87,7 @@ def test_empty_name_scores_zero():
     assert similarity("", "Bukayo Saka") == 0.0
 
 
-from ptb.core.identity.names import score_candidate
+from ptb.core.silver.names import score_candidate
 
 
 def test_score_with_only_a_name_is_the_name_similarity():

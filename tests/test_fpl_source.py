@@ -2,8 +2,8 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.archive import LocalBackend, RawArchive
-from ptb.core.sources import fpl
+from ptb.core import archive
+from ptb.core.silver import fpl
 
 
 def test_season_from_events_uses_first_deadline_year():
@@ -23,12 +23,11 @@ def _bootstrap():
 
 
 def test_ingest_archives_bootstrap_fixtures_and_each_element(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(fpl, "_fetch_bootstrap", lambda s: _bootstrap())
     monkeypatch.setattr(fpl, "_fetch_fixtures", lambda s: [{"id": 1, "event": 1}])
     monkeypatch.setattr(fpl, "_fetch_element", lambda s, eid: {"history": [], "element": eid})
 
-    keys = fpl.FplSource().ingest(archive, captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    keys = fpl.ingest(captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
 
     assert any(k.startswith("fpl/bootstrap/2024-25__") for k in keys)
     assert any(k.startswith("fpl/fixtures/2024-25__") for k in keys)
@@ -47,14 +46,13 @@ def test_ingest_archives_bootstrap_fixtures_and_each_element(tmp_path, monkeypat
 def test_ingest_always_refetches_elements(tmp_path, monkeypatch):
     """FPL is live current-season data: every run captures a fresh snapshot,
     so elements are fetched even when the archive already has them."""
-    archive = RawArchive(LocalBackend(tmp_path))
     monkeypatch.setattr(fpl, "_fetch_bootstrap", lambda s: _bootstrap())
     monkeypatch.setattr(fpl, "_fetch_fixtures", lambda s: [])
     calls = []
     monkeypatch.setattr(fpl, "_fetch_element",
                         lambda s, eid: calls.append(eid) or {"history": []})
 
-    fpl.FplSource().ingest(archive, captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
-    fpl.FplSource().ingest(archive, captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
+    fpl.ingest(captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    fpl.ingest(captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
 
     assert calls == [11, 12, 11, 12]  # both players fetched on both runs

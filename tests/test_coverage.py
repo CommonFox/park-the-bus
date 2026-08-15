@@ -3,9 +3,9 @@ from contextlib import redirect_stdout
 
 import pytest
 
-from ptb.core.warehouse import db
-from ptb.core.cli import _cmd_coverage
 from ptb.core import config
+from ptb.core import warehouse
+from ptb.core.cli import _cmd_coverage
 
 
 class _Args:
@@ -13,10 +13,10 @@ class _Args:
 
 
 @pytest.fixture
-def warehouse(tmp_path, monkeypatch):
+def loaded_warehouse(tmp_path, monkeypatch):
     db_path = tmp_path / "ptb.duckdb"
     monkeypatch.setattr(config, "DB_PATH", db_path)
-    con = db.connect(db_path)
+    con = warehouse.connect(db_path)
     con.execute(
         "INSERT INTO src_footballdata_match "
         "(competition, season, match_date, home_team, away_team, archive_key) "
@@ -47,7 +47,7 @@ def warehouse(tmp_path, monkeypatch):
     return db_path
 
 
-def test_coverage_reports_all_three_sources(warehouse):
+def test_coverage_reports_all_three_sources(loaded_warehouse):
     out = io.StringIO()
     with redirect_stdout(out):
         rc = _cmd_coverage(_Args())
@@ -60,7 +60,7 @@ def test_coverage_reports_all_three_sources(warehouse):
     assert "E0" in text
 
 
-def test_coverage_includes_fpl(warehouse):
+def test_coverage_includes_fpl(loaded_warehouse):
     out = io.StringIO()
     with redirect_stdout(out):
         rc = _cmd_coverage(_Args())
@@ -68,7 +68,7 @@ def test_coverage_includes_fpl(warehouse):
     assert "fpl" in out.getvalue()
 
 
-def test_coverage_includes_draftkings(warehouse):
+def test_coverage_includes_draftkings(loaded_warehouse):
     out = io.StringIO()
     with redirect_stdout(out):
         rc = _cmd_coverage(_Args())
@@ -79,7 +79,7 @@ def test_coverage_includes_draftkings(warehouse):
 def test_coverage_reports_empty_warehouse(tmp_path, monkeypatch):
     db_path = tmp_path / "ptb.duckdb"
     monkeypatch.setattr(config, "DB_PATH", db_path)
-    db.connect(db_path).close()
+    warehouse.connect(db_path).close()
     out = io.StringIO()
     with redirect_stdout(out):
         rc = _cmd_coverage(_Args())

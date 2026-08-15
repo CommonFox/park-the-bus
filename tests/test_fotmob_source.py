@@ -2,8 +2,8 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.archive import LocalBackend, RawArchive
-from ptb.core.sources import fotmob as fm
+from ptb.core import archive
+from ptb.core.silver import fotmob as fm
 
 
 def test_season_label_shortens_fotmob_name():
@@ -43,12 +43,11 @@ def _patch(monkeypatch, calls):
 
 
 def test_ingest_sweeps_each_stat_and_type(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     calls = []
     _patch(monkeypatch, calls)
 
-    keys = fm.FotmobSource().ingest(
-        archive, leagues=["premier-league"], seasons=["2024/25"],
+    keys = fm.ingest(
+        leagues=["premier-league"], seasons=["2024/25"],
         captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
 
     assert any(k.startswith("fotmob/premier-league/players/2024-25__goals__") for k in keys)
@@ -64,32 +63,29 @@ def test_ingest_sweeps_each_stat_and_type(tmp_path, monkeypatch):
 
 
 def test_ingest_is_incremental(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     calls = []
     _patch(monkeypatch, calls)
 
-    fm.FotmobSource().ingest(archive, leagues=["premier-league"], seasons=["2024/25"],
-                             captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    fm.ingest(leagues=["premier-league"], seasons=["2024/25"],
+              captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
     first = len(calls)
-    fm.FotmobSource().ingest(archive, leagues=["premier-league"], seasons=["2024/25"],
-                             captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
+    fm.ingest(leagues=["premier-league"], seasons=["2024/25"],
+              captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
     assert len(calls) == first  # everything already archived
 
 
 def test_refetch_repulls(tmp_path, monkeypatch):
-    archive = RawArchive(LocalBackend(tmp_path))
     calls = []
     _patch(monkeypatch, calls)
 
-    fm.FotmobSource().ingest(archive, leagues=["premier-league"], seasons=["2024/25"],
-                             captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
+    fm.ingest(leagues=["premier-league"], seasons=["2024/25"],
+              captured_at=dt.datetime(2026, 8, 3, 12, 0, 0))
     n = len(calls)
-    fm.FotmobSource().ingest(archive, leagues=["premier-league"], seasons=["2024/25"],
-                             refetch=True, captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
+    fm.ingest(leagues=["premier-league"], seasons=["2024/25"],
+              refetch=True, captured_at=dt.datetime(2026, 8, 3, 13, 0, 0))
     assert len(calls) > n
 
 
 def test_ingest_rejects_unknown_league(tmp_path):
-    archive = RawArchive(LocalBackend(tmp_path))
     with pytest.raises(ValueError, match="la-liga"):
-        fm.FotmobSource().ingest(archive, leagues=["la-liga"], seasons=["2024/25"])
+        fm.ingest(leagues=["la-liga"], seasons=["2024/25"])

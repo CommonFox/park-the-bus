@@ -8,7 +8,16 @@
   "fetched_at": "2026-08-03T12:00:00Z",
   "data": {
     "teams": {},
-    "players": [],
+    "players": [
+      {"id": "500", "player_name": "Bukayo Saka", "team_title": "Arsenal", "position": "F M",
+       "games": "10", "time": "850", "goals": "5", "npg": "4", "assists": "3", "shots": "22",
+       "key_passes": "15", "xG": "4.512", "npxG": "3.812", "xA": "2.345",
+       "xGBuildup": "1.234", "xGChain": "5.678", "yellow_cards": "1", "red_cards": "0"},
+      {"id": "181", "player_name": "Bernd Leno", "team_title": "Fulham", "position": "GK",
+       "games": "10", "time": "900", "goals": "0", "npg": "0", "assists": "0", "shots": "0",
+       "key_passes": "0", "xG": "0", "npxG": "0", "xA": "0",
+       "xGBuildup": "0", "xGChain": "0", "yellow_cards": "0", "red_cards": "0"}
+    ],
     "dates": [
       {"id": "1001", "isResult": true,
        "h": {"id": "1", "title": "Arsenal", "short_title": "ARS"},

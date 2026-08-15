@@ -2,13 +2,13 @@ import datetime as dt
 
 import pytest
 
-from ptb.core.identity import matches
-from ptb.core.warehouse import db
+from ptb.core import warehouse
+from ptb.core.silver import footballdata, matches
 
 
 @pytest.fixture
 def con(tmp_path):
-    connection = db.connect(tmp_path / "test.duckdb")
+    connection = warehouse.connect(tmp_path / "test.duckdb")
     yield connection
     connection.close()
 
@@ -102,7 +102,7 @@ def test_resolve_footballdata_maps_loaded_rows(con):
         "VALUES ('E0', '2024/25', DATE '2024-08-16', TIME '20:00', "
         "        'Man United', 'Fulham', 'k')"
     )
-    resolved = matches.resolve_footballdata(con)
+    resolved = footballdata.resolve_matches(con)
 
     assert resolved == 1
     row = con.execute(
@@ -119,6 +119,6 @@ def test_resolve_footballdata_is_idempotent(con):
         "VALUES ('E0', '2024/25', DATE '2024-08-16', TIME '20:00', "
         "        'Man United', 'Fulham', 'k')"
     )
-    matches.resolve_footballdata(con)
-    matches.resolve_footballdata(con)
+    footballdata.resolve_matches(con)
+    footballdata.resolve_matches(con)
     assert con.execute("SELECT count(*) FROM dim_match").fetchone()[0] == 1
